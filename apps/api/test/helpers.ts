@@ -1,5 +1,5 @@
 import { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
+import { Test, TestingModuleBuilder } from '@nestjs/testing';
 import { PrismaClient, Role, FacilityType } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import request from 'supertest';
@@ -8,8 +8,8 @@ import { configureApp } from '../src/bootstrap';
 
 export const PASSWORD = 'TestPassword123!';
 
-export async function createApp() {
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+export async function createApp(customize: (b: TestingModuleBuilder) => TestingModuleBuilder = (b) => b) {
+  const moduleRef = await customize(Test.createTestingModule({ imports: [AppModule] })).compile();
   const app = configureApp(moduleRef.createNestApplication());
   await app.init();
   return app;
