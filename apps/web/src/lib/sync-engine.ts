@@ -104,13 +104,19 @@ export class SyncEngine {
       return;
     }
     const { outbox } = this.deps.db;
-    if (!this.state.online && this.deps.ping) {
-      // Browser says online but the last attempt could not reach the server: probe first.
+    if (this.deps.ping) {
+      // Probe on every flush — also when nothing is queued — so the UI never shows
+      // "online / synced" while the server is actually unreachable (weak rural signal).
       const reachable = await this.deps.ping().catch(() => false);
-      if (!reachable) return;
-      this.set({ online: true });
-      // Connectivity is back: everything queued is due now, not after its backoff.
-      await outbox.where('syncStatus').equals('failed').modify({ nextAttemptAt: 0 });
+      if (!reachable) {
+        this.set({ online: false });
+        return;
+      }
+      if (!this.state.online) {
+        this.set({ online: true });
+        // Connectivity is back: everything queued is due now, not after its backoff.
+        await outbox.where('syncStatus').equals('failed').modify({ nextAttemptAt: 0 });
+      }
     }
     const now = this.now();
     const due = (await outbox.where('syncStatus').anyOf('pending', 'failed').sortBy('createdAt'))

@@ -99,7 +99,7 @@ describe('SyncEngine', () => {
 
   it('treats an unreachable server as offline and recovers via ping', async () => {
     class NetErr extends Error {}
-    let reachable = false;
+    let reachable = true;
     engine = new SyncEngine({
       db,
       send,
@@ -108,20 +108,45 @@ describe('SyncEngine', () => {
       ping: async () => reachable,
       now: () => clock,
     });
-    send.mockRejectedValueOnce(new NetErr('unreachable'));
+    send.mockRejectedValueOnce(new NetErr('unreachable')); // server drops right after the probe
     await engine.enqueue(op());
     await engine.flush();
     expect(engine.getState().online).toBe(false);
     expect(engine.getState().failed).toBe(1);
 
-    await engine.flush(); // ping fails → stays queued, no send
+    reachable = false;
+    await engine.flush(); // probe fails → stays queued, no send
     expect(send).toHaveBeenCalledTimes(1);
+    expect(engine.getState().online).toBe(false);
 
     reachable = true;
-    await engine.flush(); // ping ok → backoff skipped, op synced immediately
+    await engine.flush(); // probe ok → backoff skipped, op synced immediately
     expect(engine.getState().online).toBe(true);
     expect(send).toHaveBeenCalledTimes(2);
     expect((await db.outbox.toArray())[0].syncStatus).toBe('synced');
+  });
+
+  it('shows offline even with an empty queue when the server is unreachable', async () => {
+    engine = new SyncEngine({ db, send, isOnline: () => true, ping: async () => false, now: () => clock });
+    expect(engine.getState().online).toBe(true);
+    await engine.flush();
+    expect(engine.getState().online).toBe(false);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('never loses queued data when every sync attempt fails', async () => {
+    online = true;
+    send.mockRejectedValue(new Error('server down'));
+    await engine.enqueue(op());
+    for (let i = 0; i < 5; i++) {
+      clock += 10 * 60_000;
+      await engine.flush();
+    }
+    const [stored] = await db.outbox.toArray();
+    expect(stored.syncStatus).toBe('failed');
+    expect(stored.retryCount).toBe(5); // enqueue's flush shares the first run
+    expect(stored.payload).toEqual({ patientId: 'p1', spo2: 95 });
+    expect(engine.getState().lastError).toBe('server down');
   });
 
   it('caps the backoff', () => {

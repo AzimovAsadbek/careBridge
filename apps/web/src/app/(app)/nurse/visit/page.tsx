@@ -5,7 +5,7 @@ import { Suspense, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useResource } from '@/lib/resource';
 import { errorMessage } from '@/lib/api';
-import { age, dueIn } from '@/lib/format';
+import { age, dueIn, fmtDateTime } from '@/lib/format';
 import { queueFollowUpStatus, queueObservation, useOutbox } from '@/lib/outbox';
 import { getSyncEngine, useSyncState } from '@/lib/sync';
 import { usePollWhile } from '@/lib/poll';
@@ -157,6 +157,12 @@ function Visit({ id }: { id: string }) {
           <span className={cx('text-xs', due.overdue ? 'font-semibold text-red-600' : 'text-slate-500')}>{due.text}</span>
         </div>
       </div>
+
+      {(visits.stale || patient.stale) && (
+        <Alert tone="amber" title="Offline — using the copy saved on this device">
+          Visit details from {fmtDateTime(visits.cachedAt ?? patient.cachedAt)}. Anything you record is stored here and synced automatically.
+        </Alert>
+      )}
 
       <Card>
         <CardTitle>Reason for follow-up</CardTitle>
