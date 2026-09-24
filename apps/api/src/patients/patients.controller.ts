@@ -47,7 +47,7 @@ export class PatientsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CreateObservationDto,
   ) {
-    const { observation } = await this.observations.record(user, id, dto);
-    return observation;
+    const { observation, risk } = await this.observations.record(user, id, dto);
+    return { ...observation, risk };
   }
 }

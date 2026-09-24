@@ -14,6 +14,7 @@ import { HealthController } from './health.controller';
 import { PatientsModule } from './patients/patients.module';
 import { ReferralsModule } from './referrals/referrals.module';
 import { FollowUpsModule } from './follow-ups/follow-ups.module';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { FollowUpsModule } from './follow-ups/follow-ups.module';
     PatientsModule,
     ReferralsModule,
     FollowUpsModule,
+    AiModule,
   ],
   controllers: [HealthController],
   providers: [

@@ -1,10 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Observation } from '@prisma/client';
+import { Observation, RiskAssessment } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { followUpScope } from '../common/access/scopes';
 import { PatientsService } from './patients.service';
+import { RiskService } from '../ai/risk.service';
 import { CreateObservationDto } from './dto/observation.dto';
 
 @Injectable()
@@ -13,6 +14,7 @@ export class ObservationsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly patients: PatientsService,
+    private readonly risk: RiskService,
   ) {}
 
   /**
@@ -24,7 +26,7 @@ export class ObservationsService {
     patientId: string,
     dto: CreateObservationDto,
     opts: { fromOffline?: boolean } = {},
-  ): Promise<{ observation: Observation; created: boolean }> {
+  ): Promise<{ observation: Observation; created: boolean; risk?: RiskAssessment }> {
     await this.patients.assertAccess(user, patientId);
 
     if (dto.clientId) {
@@ -64,6 +66,8 @@ export class ObservationsService {
       entityId: observation.id,
       metadata: { patientId, offline: !!opts.fromOffline },
     });
-    return { observation, created: true };
+    // Every new observation is triaged immediately so risky patients surface on dashboards.
+    const risk = await this.risk.assessPatient(patientId, observation.id);
+    return { observation, created: true, risk };
   }
 }
