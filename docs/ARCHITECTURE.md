@@ -10,8 +10,8 @@
 | Repo | Empty directory, no git. `origin` = `github.com/AzimovAsadbek/careBridge` (empty remote) |
 | Runtime | Node 24, npm 11 (no pnpm/yarn) |
 | Database | No local Postgres → run PostgreSQL 16 via Docker Compose on host port 5434 |
-| AI credentials | None provided → AI module must work with a deterministic local engine, LLM optional via env |
-| Blockers | None critical. LLM key is optional, not required for the demo |
+| AI credentials | Gemini key added later (server-side `.env`); deterministic rules remain the floor and fallback |
+| Blockers | Gemini free tier: 20 req/day/model → fallback model chain + rule fallback |
 
 Version choices favour stability over novelty: Next.js 15, NestJS 11, Prisma 6, TypeScript 5.9, Tailwind 4.
 
@@ -29,8 +29,8 @@ Version choices favour stability over novelty: Next.js 15, NestJS 11, Prisma 6, 
  │ auth · users · facilities · patients · referrals ·     │
  │ follow-ups · sync · ai · feedback · analytics · audit  │
  └───────────────┬──────────────────────────┬─────────────┘
-                 │ Prisma                   │ AI provider (optional LLM)
-            PostgreSQL 16            rule engine fallback (always on)
+                 │ Prisma                   │ AiProvider → GeminiProvider (server-side)
+            PostgreSQL 16            rules + safety layer (always on)
 ```
 
 ## C. Database schema (Prisma)
@@ -83,20 +83,25 @@ global sync status badge.
 
 ## F. AI architecture
 
-`AiModule` exposes two use-cases, each with the same pipeline:
-`input → provider (LLM if configured, else rule engine) → zod schema validation → fallback to rule engine on
-timeout / malformed output / provider error → persisted with engine tag`.
-
-1. **Risk prioritization** – vitals + age + recent discharge + symptoms → `{ riskLevel, score, factors[], recommendedAction }`.
-   Transparent weighted rules (e.g. SpO2 < 92, SBP ≥ 180, temp ≥ 38.5, discharge < 14 days, age ≥ 65).
-2. **Feedback intelligence** – free text (Uzbek/Russian/English) → `{ sentiment, category, topics[], priority }`.
-   Keyword lexicon fallback in uz/ru/en.
-
-AI output is labelled *decision support*, never diagnosis; clinicians confirm all actions.
+- `AiProvider` (abstraction) → `GeminiProvider` (`@google/genai`).
+  - Model chain: `GEMINI_MODEL` → `GEMINI_FALLBACK_MODELS`; a model is cooled down on daily-quota errors or when it doesn't exist.
+  - JSON-schema output (`responseJsonSchema`), then Zod re-validation.
+  - Client-side timeout; failure reasons are `timeout | quota | unavailable | blocked | malformed | error | not_configured`.
+- `AiJobs`: in-process background runner that retries transient failures (honouring Gemini's `retryDelay`). AI never blocks requests.
+- `RiskService` / `FeedbackAnalysisService`:
+  - store the deterministic result immediately (`aiPending`);
+  - then upgrade it through `risk.safety.ts` / `feedback.safety.ts`.
+- Engines: `RULE_ENGINE | GEMINI | GEMINI_WITH_RULE_OVERRIDE | FALLBACK_RULE_ENGINE`.
+- Safety invariants:
+  - AI never lowers rule risk or feedback safety priority;
+  - no medication or dosing advice;
+  - no diagnostic conclusions;
+  - untrusted text is escaped and delimited;
+  - de-identified inputs.
 
 ## G. Offline / sync architecture
 
-- Service worker caches the app shell and visited pages; API reads are cached in IndexedDB.
+- Build-versioned service worker (`/sw.js?v=<buildId>`): each deploy precaches the offline shells and their JS/CSS, and deletes older caches. API reads are cached in IndexedDB.
 - Every mutation from the nurse workflow goes to the **outbox** (`localOperationId, entityType, entityId,
   operationType CREATE|UPDATE, payload, createdAt, syncStatus pending|syncing|failed|synced, retryCount, lastError`).
 - Online: outbox is flushed immediately. Offline: stays local, UI shows OFFLINE + pending count.
@@ -134,7 +139,7 @@ audit log for login, discharge, referral changes, observations, sync · no PHI i
 
 | Risk | Mitigation |
 |---|---|
-| No LLM key / venue Wi-Fi fails | Rule engine is primary fallback; demo never depends on the network |
+| Gemini quota / venue Wi-Fi fails | Fallback model chain, then rule engine; demo never depends on the network |
 | Offline edge cases eat time | Scope offline to nurse visit flow only (observations + follow-up status) |
 | Sync duplicates | Client-generated UUIDs + unique `clientId` → idempotent |
 | Service worker caching bugs in dev | SW only registered in production build; demo runs `next build && next start` |

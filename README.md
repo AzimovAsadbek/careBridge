@@ -34,8 +34,8 @@ Hospital ─► discharge ─► automatic referral ─► family doctor ─► 
 │  sync · ai · feedback · analytics · audit                         │
 └──────────────┬─────────────────────────────────────┬──────────────┘
                │ Prisma 6                            │ optional
-        PostgreSQL 16                     Claude (structured outputs)
-                                          + deterministic rule engine
+        PostgreSQL 16                     Gemini (server-side, structured JSON)
+                                          + deterministic safety rules
 ```
 
 - **Modular monolith**: one deployable API, organized by domain.
@@ -49,38 +49,73 @@ Hospital ─► discharge ─► automatic referral ─► family doctor ─► 
 | Frontend | Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS 4, Dexie (IndexedDB), hand-written service worker |
 | Backend | NestJS 11, TypeScript, class-validator DTOs, Passport JWT, @nestjs/throttler, Helmet |
 | Database | PostgreSQL 16 (Docker), Prisma 6 migrations |
-| AI | Transparent rule engines, plus an optional Anthropic Claude model via `@anthropic-ai/sdk` structured outputs, validated with Zod |
+| AI | Google Gemini (`@google/genai`, server-side only) with JSON-schema output validated by Zod, behind deterministic rule engines and a safety layer |
 | Tests | Jest (API unit + e2e with Supertest against a real test DB), Vitest + fake-indexeddb (sync engine) |
 
 ---
 
 ## AI components (decision support, not diagnosis)
 
-Every AI output is labeled in the UI as *decision support*. Final clinical decisions stay with qualified professionals.
+Every AI output is labelled in the UI as *decision support*. Final clinical decisions stay with qualified professionals.
+
+**Provider:** Google Gemini, called only from the API (`apps/api/src/ai/gemini.provider.ts`). The web app never sees the key.
+
+**Models:**
+- `GEMINI_MODEL` (default `gemini-3.8-flash`, verified available for the project key).
+- Tried next when the primary is out of quota, overloaded (503) or missing: `GEMINI_FALLBACK_MODELS` (default `gemini-3.5-flash`).
+- Each stored result records the model that actually answered.
+
+### Pipeline (same for both features)
+```
+input ─► deterministic rules (instant, stored immediately, "AI pending")
+      └► background job ─► Gemini (JSON schema) ─► Zod re-validation ─► safety layer ─► update record
+                          └ timeout / 429 / 503 → retried (honours Gemini's retryDelay), then FALLBACK_RULE_ENGINE
+```
+- AI never blocks clinical work. A nurse's sync returns in milliseconds, and the Gemini review lands a few seconds later; the UI shows "Gemini is reviewing…".
+- Stored engine values:
+  - `RULE_ENGINE`: no AI configured;
+  - `GEMINI`: AI result accepted;
+  - `GEMINI_WITH_RULE_OVERRIDE`: the safety rules kept a higher risk or priority than Gemini suggested;
+  - `FALLBACK_RULE_ENGINE`: AI was configured but failed.
 
 ### 1. Risk prioritization
-- **Input:** age, days since discharge, referral priority, blood pressure, pulse, temperature, SpO₂, general condition, and free-text symptoms and notes in any language.
-- **Rule engine (always runs):** weighted, explainable factors, e.g. `SpO₂ < 90 → +4 (critical)` or `discharged ≤ 7 days → +2`. Critical findings force HIGH. Red-flag symptoms are detected in Uzbek, Russian and English.
-- **LLM review (when `ANTHROPIC_API_KEY` is set):** Claude reviews the record and the rule result and may add factors (e.g. from free-text notes). **It can raise the level but never lower it.**
-- **Output:** `{ riskLevel, score, factors[], recommendedAction }`, stored with the engine that produced it (`RULES` or `LLM`).
-- **When it runs:** automatically after every observation (including synced offline ones), or on demand.
+- **Input (de-identified):**
+  - age, days since discharge and referral priority;
+  - vitals: BP, pulse, temperature, SpO₂;
+  - general condition, symptoms, and free-text notes in any language;
+  - the last 3 observations as a trend.
 
-### 2. Feedback intelligence
-- **Input:** anonymous free text (e.g. *"Palatada juda uzoq kutdik, hamshirani chaqirsak kech keldi."*) plus rating and type.
-- **Output:** `{ sentiment, category, topics[], priority, summary }`.
-- **Categories and topics are fixed enums**, so the model cannot invent labels.
-- **Safety net:** keyword-detected safety or corruption signals (bribes, wrong medication, abuse) are always HIGH priority, even if the model disagrees.
+  No names, addresses, phone numbers or ids are sent.
+- **Gemini output:** `{ riskLevel, reasons[], recommendedAction, confidence, warnings[] }`.
+- **Safety layer** ([`risk.safety.ts`](apps/api/src/ai/risk.safety.ts)):
+  - **AI may raise but never lower the rule-based risk.** For example, rules HIGH + Gemini LOW → HIGH (`GEMINI_WITH_RULE_OVERRIDE`).
+  - Emergency thresholds always apply (SpO₂ < 90, SBP ≥ 180, critical condition, …).
+  - Medication and dosing advice is withheld.
+  - Diagnostic conclusions ("suggests heart failure", "for suspected sepsis") are stripped or withheld. CareBridge prioritizes risk; it does not diagnose.
+  - Every override is explained in `warnings`.
+- **Stored:** final level, rule and AI reasons (tagged separately), action, confidence, warnings, engine, model, timestamps.
 
-### 3. Care coordinator (lightweight)
-The admin dashboard produces a ranked "needs attention now" worklist (overdue, AI-high-risk, high-priority) and plain-language operational insights.
+### 2. Feedback intelligence (anonymous QR feedback)
+- **Input:** free text in Uzbek (Latin or Cyrillic), Russian or English, plus rating and type.
+- **Gemini output:** `{ category, sentiment, priority, topics[], safetySignal, summary }`. All fields except the summary are enums.
+- **Safety layer** ([`feedback.safety.ts`](apps/api/src/ai/feedback.safety.ts)):
+  - A safety signal from **either** the multilingual keyword rules **or** Gemini forces HIGH priority. This covers bribery, abuse, threats, negligence, wrong medication, deaths, and unattended emergencies.
+  - Gemini cannot move a keyword-detected safety report into a non-safety category.
+  - Summaries are scrubbed of phone numbers and e-mail addresses.
+- **Anonymity:** nothing about the submitter is stored or sent (no IP, device, user or patient link).
 
-### AI safety and robustness
-- **Structured outputs:** `messages.parse` with a Zod schema, **re-validated on the server**.
-- **Fallback:** any failure (timeout, API error, refusal, malformed output) falls back to the rule engine, so the demo never depends on network AI.
-- **Prompt injection:** patient text is wrapped in delimiters, and the model is instructed to treat it as data. The output can only contain enumerated values plus short capped strings.
-- **Tested:** valid response, malformed output, refusal, timeout, unavailable service, and the never-downgrade rule ([`apps/api/src/ai/*.spec.ts`](apps/api/src/ai)).
+### 3. Care coordinator
+The admin dashboard shows a ranked "needs attention now" worklist (overdue, AI-high-risk, high-priority) and plain-language operational insights.
 
----
+### Prompt-injection defence
+- Patient notes and feedback are treated as **untrusted data**. They are JSON-encoded, with `<`/`>` escaped, inside delimiters, so they cannot close their tag or pose as instructions.
+- System instructions are sent as Gemini's `systemInstruction`.
+- The output is constrained by a JSON schema and re-validated.
+- Tested with "ignore all previous instructions…" attacks: they cannot lower a bribery report.
+
+### Verified live
+- `gemini-3.8-flash` / `gemini-3.5-flash` classified Uzbek and Russian feedback correctly and ignored an injection attempt (correctly flagging corruption, HIGH).
+- In risk review, Gemini read an Uzbek note ("tunda yotolmayapti": can't lie flat at night), detected a SpO₂/pulse trend and flagged missing BP.
 
 ## Offline and sync architecture
 
@@ -174,8 +209,10 @@ npm exec -w apps/api -- prisma migrate reset --force
 | `PORT` | api | API port (default 4000) |
 | `CORS_ORIGINS` | api | Comma-separated allowed web origins |
 | `TRUST_PROXY` | api | `true` behind a reverse proxy (correct IPs for rate limiting) |
-| `ANTHROPIC_API_KEY` | api | Optional. Enables the LLM layer; empty means rule engine only |
-| `AI_MODEL` / `AI_TIMEOUT_MS` | api | Model id (default `claude-opus-5`) and timeout (default 8000 ms) |
+| `GEMINI_API_KEY` | api | Optional. Enables Gemini; empty means deterministic rules only. **Server-side only, never commit it** |
+| `GEMINI_MODEL` | api | Primary model (default `gemini-3.8-flash`) |
+| `GEMINI_FALLBACK_MODELS` | api | Comma-separated models tried on quota/overload (default `gemini-3.5-flash`) |
+| `AI_TIMEOUT_MS` | api | Client-side timeout per Gemini call (default 20000; Gemini rejects server deadlines < 10 s) |
 | `NEXT_PUBLIC_API_URL` | web | API base URL, e.g. `http://localhost:4000/api` |
 
 ### Commands
@@ -186,6 +223,7 @@ npm exec -w apps/api -- prisma migrate reset --force
 | `npm run lint` | ESLint for api + web |
 | `npm test` | API unit tests (Jest) + web sync-engine tests (Vitest) |
 | `npm run test:e2e` | API integration tests against `carebridge_test` (create it once: `docker compose exec db createdb -U carebridge carebridge_test`, then `DATABASE_URL=…/carebridge_test npx prisma migrate deploy` in `apps/api`) |
+| `npm run test:smoke -w apps/api` | **Live** Gemini smoke test (opt-in; uses `GEMINI_API_KEY` from `apps/api/.env`, retries transient errors, never prints the key) |
 | `npm run build` | Production builds |
 
 ### Demo accounts (seed data, all fictional)
@@ -210,10 +248,10 @@ Public QR feedback: `/f/SAM-RH-01`, `/f/URG-FP-07`, `/f/URG-QVP-12` (QR codes ar
 3. **Nurse (phone width)**: *My visits* lists Rustam. Open the visit once online.
 4. **Turn off the network** (DevTools → Offline, or stop the servers). The badge switches to *Offline*.
 5. Record vitals (e.g. SpO₂ 89, pulse 108, "Shortness of breath"). They're saved on the device; the badge shows *N changes saved on device*. Complete the visit.
-6. **Turn the network back on.** The badge shows *Syncing…* then *synced*, and the AI risk card appears (HIGH, with explained factors).
+6. **Turn the network back on.** Sync is automatic. The rule-based risk (HIGH) appears immediately with *Gemini is reviewing…*, then updates to *Gemini AI · checked by safety rules* with AI reasons, confidence and warnings.
 7. **Admin**: the *Command center* shows continuity, overdue follow-ups, high-risk patients, offline-synced visits and AI coordinator insights.
 8. **Patient**: scan the ward QR code and submit *"Palatada juda uzoq kutdik, hamshirani chaqirsak kech keldi."* anonymously.
-9. **Admin**: under *Patient voice* it is classified as negative · service quality · waiting time + staff response · medium priority. A seeded Russian bribery complaint is flagged **HIGH / corruption**.
+9. **Admin**: under *Patient voice*, Gemini classifies it (negative · service quality · waiting time + staff response). Bribery or negligence reports carry a red **Safety signal** and are always HIGH.
 10. Back on Rustam's record: **Care Continuity Score 100%**.
 
 ---
@@ -232,20 +270,34 @@ Public QR feedback: `/f/SAM-RH-01`, `/f/URG-FP-07`, `/f/URG-QVP-12` (QR codes ar
 - **Headers:** Helmet on the API. On the web: a strict CSP (`connect-src` limited to the API), `X-Frame-Options: DENY`, `nosniff` and a Referrer-Policy. CORS is limited to configured origins.
 - **Audit log** for login (success and failure), patient create/update, discharge, referral creation/accept/overdue, follow-up transitions, observations, sync batches and AI assessments. Metadata holds ids and statuses only, **no PHI**.
 - **Logging:** the error filter logs route and error name only (no request bodies) and returns a uniform error shape without stack traces.
-- **Secrets:** `.env` files are git-ignored and only `.env.example` files are committed. The API refuses a weak JWT secret.
+- **Secrets:**
+  - `.env` files are git-ignored and only `.env.example` files are committed.
+  - The API refuses a weak JWT secret.
+  - `GEMINI_API_KEY` is read only by the API, is never logged, returned or bundled, and is sent only as the `x-goog-api-key` header. The build output and logs were scanned for the key.
+  - Tests never load the real key (`ignoreEnvFile` under `NODE_ENV=test`).
+- **Logging:** Prisma error messages (which embed query data) are never logged, only their class and code. The AI provider logs only failure reasons and status codes, never prompts or outputs.
+- **Permissions:**
+  - nurses can't list the staff directory;
+  - nurses can't change a patient's care status or family doctor;
+  - manual AI re-assessment is rate limited (10/min).
 - **Session storage:** the web session is stored in `localStorage` so nurses stay signed in offline. The trade-off is XSS exposure, mitigated by the CSP and React escaping. Sign-out clears cached records; unsynced work is kept until it reaches the server.
 
 ## Limitations (honest)
 
-- **Rule weights** are illustrative, not clinically validated. Neither the risk level nor the Continuity Score is a medical score.
-- **LLM path:** without an `ANTHROPIC_API_KEY` only the rule engines run. The LLM path is covered by mocked tests and was not exercised against the live API in this environment.
-- **Offline scope:**
-  - the nurse home-visit workflow (observations and follow-up status) works fully offline;
-  - patient registration, discharge and referral assignment need a connection;
-  - a visit must be opened once online to be available offline.
+- **Rule weights** are illustrative, not clinically validated. Neither the risk level nor the Continuity Score is a medical score, and AI output is decision support only.
+- **Gemini free-tier quota:**
+  - `gemini-3.8-flash` allows **20 requests per day per model** (plus per-minute limits and occasional 503 "high demand").
+  - The fallback chain and rule fallback keep the product working, but for a live demo enable billing or keep a fallback model with spare quota.
+  - Google's unpaid tier may use prompts to improve its products. Even though inputs are de-identified, use a paid tier (or Vertex AI) for real patient data.
+- **Offline scope** (only these flows work offline):
+  - opening an already-downloaded home visit;
+  - recording observations;
+  - starting and completing the visit.
+
+  Patient registration, discharge, referral assignment, AI review and feedback analysis need a connection. A visit must be opened once online to be available offline.
+- **Background AI jobs** run in-process. Pending reviews are resumed at API start, but there is no durable queue.
 - **Conflict handling:** creates are idempotent and follow-up status only moves forward. There is no field-level merge UI.
-- **Notifications:** doctors are notified in-app (worklist "New" badge). There are no SMS/push notifications yet.
-- **Infrastructure:** single-node rate limiting (in-memory) and no refresh tokens.
+- **Infrastructure:** single-node in-memory rate limiting, and no refresh tokens (JWT in `localStorage`, mitigated by CSP).
 - **Dependencies:** `npm audit` reports advisories in dev and build tooling only (vitest's mocker, the postcss version bundled inside Next).
 
 ## Roadmap
