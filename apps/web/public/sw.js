@@ -1,15 +1,39 @@
 /* CareBridge service worker — caches the app shell so nurses can work offline.
- * API data is NOT cached here; the app keeps it in IndexedDB. */
-const VERSION = 'cb-v2';
+ * API data is NOT cached here; the app keeps it in IndexedDB.
+ * The cache is versioned by build id (registered as /sw.js?v=<buildId>): each deploy installs a
+ * new worker, precaches fresh shells and deletes every older cache (including old JS chunks). */
+const VERSION = 'cb-' + (new URL(self.location.href).searchParams.get('v') || 'dev');
 const PRECACHE = ['/', '/login', '/nurse', '/nurse/visit', '/manifest.webmanifest', '/icon.svg'];
 
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches
-      .open(VERSION)
-      .then((cache) => Promise.all(PRECACHE.map((url) => cache.add(url).catch(() => undefined))))
-      .then(() => self.skipWaiting()),
+/**
+ * Precache the offline shells AND every static asset they reference. Caching only the HTML is not
+ * enough: the route's JS chunk may have been prefetched before this worker took control, and it
+ * would then be missing offline (ChunkLoadError).
+ */
+async function precache() {
+  const cache = await caches.open(VERSION);
+  const assets = new Set();
+  await Promise.all(
+    PRECACHE.map(async (url) => {
+      try {
+        // cache: 'reload' bypasses the HTTP cache so the shell always matches this build.
+        const res = await fetch(new Request(url, { cache: 'reload' }));
+        if (!res.ok) return;
+        await cache.put(url, res.clone());
+        if ((res.headers.get('content-type') || '').includes('text/html')) {
+          const html = await res.text();
+          for (const m of html.matchAll(/\/_next\/static\/[^"'\s<>\\]+/g)) assets.add(m[0]);
+        }
+      } catch {
+        /* offline during install: runtime caching fills in later */
+      }
+    }),
   );
+  await Promise.all([...assets].map((a) => cache.add(a).catch(() => undefined)));
+}
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(precache().then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (event) => {

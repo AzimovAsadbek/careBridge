@@ -7,7 +7,8 @@ export function ServiceWorkerRegister() {
   useEffect(() => {
     if (process.env.NODE_ENV !== 'production' || !('serviceWorker' in navigator)) return;
     navigator.serviceWorker
-      .register('/sw.js', { scope: '/', updateViaCache: 'none' })
+      // Build-versioned URL: a new deploy always installs a new worker with fresh caches.
+      .register(`/sw.js?v=${encodeURIComponent(process.env.NEXT_PUBLIC_BUILD_ID ?? 'dev')}`, { scope: '/', updateViaCache: 'none' })
       .then((reg) => reg.update())
       .catch(() => undefined);
   }, []);

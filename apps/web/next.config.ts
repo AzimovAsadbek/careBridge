@@ -25,8 +25,17 @@ const securityHeaders = [
   },
 ];
 
+/**
+ * One id per build. It versions the service worker (/sw.js?v=<id>), so every deploy installs a new
+ * worker that re-caches the app shell and drops the previous build's caches.
+ */
+// Stored in process.env so the build worker processes Next spawns inherit the same id.
+const BUILD_ID = (process.env.BUILD_ID ??= `b${Date.now().toString(36)}`);
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  generateBuildId: async () => BUILD_ID,
+  env: { NEXT_PUBLIC_BUILD_ID: BUILD_ID },
   poweredByHeader: false,
   async headers() {
     return [
