@@ -209,8 +209,12 @@ export interface FeedbackItem {
     category: string;
     topics: string[];
     priority: Priority;
+    safetySignal: boolean;
     summary: string | null;
-    engine: 'RULES' | 'LLM';
+    engine: AiEngine;
+    warnings: string[];
+    model: string | null;
+    aiPending: boolean;
   } | null;
 }
 
@@ -239,4 +243,11 @@ export interface Dashboard {
     assignedDoctor: { fullName: string } | null;
   }[];
   insights: string[];
+}
+
+export interface AiStatus {
+  provider: string;
+  model: string;
+  enabled: boolean;
+  ruleEngine: boolean;
 }

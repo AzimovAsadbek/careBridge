@@ -29,7 +29,8 @@ export class FeedbackService {
       data: { facilityId: facility.id, ward: dto.ward || null, rating: dto.rating, type: dto.type, text: dto.text || null },
       select: { id: true },
     });
-    this.analysis.analyzeInBackground(fb.id);
+    // Keyword result is stored now; the Gemini review runs in the background. Nothing is returned to the submitter.
+    await this.analysis.analyze(fb.id);
     return { received: true };
   }
 
@@ -53,7 +54,9 @@ export class FeedbackService {
     return { items, total, page: q.page, pageSize: q.pageSize };
   }
 
-  reanalyze(id: string) {
-    return this.analysis.analyzeAndStore(id);
+  async reanalyze(id: string) {
+    const row = await this.analysis.analyze(id);
+    if (!row) throw new NotFoundException('Feedback not found');
+    return row;
   }
 }

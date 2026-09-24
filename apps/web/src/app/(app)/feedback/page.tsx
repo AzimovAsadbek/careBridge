@@ -4,10 +4,19 @@ import { useEffect, useState } from 'react';
 import { useResource } from '@/lib/resource';
 import { errorMessage } from '@/lib/api';
 import { fmtDateTime, humanize } from '@/lib/format';
-import type { Facility, FeedbackItem, Paginated, Priority, Sentiment } from '@/lib/types';
+import type { AiEngine, Facility, FeedbackItem, Paginated, Priority, Sentiment } from '@/lib/types';
+import { usePollWhile } from '@/lib/poll';
+import { modelName } from '@/components/clinical';
 import { PriorityBadge, SentimentBadge } from '@/components/badges';
 import { QrCode } from '@/components/QrCode';
-import { Badge, Button, Card, CardTitle, EmptyState, ErrorState, Loading, PageHeader, Select } from '@/components/ui';
+import { Badge, Button, Card, CardTitle, EmptyState, ErrorState, Loading, PageHeader, Select, Spinner } from '@/components/ui';
+
+const ENGINE_LABEL: Record<AiEngine, string> = {
+  GEMINI: 'Gemini AI',
+  GEMINI_WITH_RULE_OVERRIDE: 'Gemini · safety rules applied',
+  FALLBACK_RULE_ENGINE: 'Keyword rules · AI unavailable',
+  RULE_ENGINE: 'Keyword rules',
+};
 
 export default function FeedbackPage() {
   const [sentiment, setSentiment] = useState<Sentiment | ''>('');
@@ -22,6 +31,7 @@ export default function FeedbackPage() {
   const { data, error, loading, reload } = useResource<Paginated<FeedbackItem>>(`/feedback?${qs}`);
   const facilities = useResource<Facility[]>('/facilities');
   const pages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
+  usePollWhile(!!data?.items.some((f) => f.analysis?.aiPending), reload);
 
   return (
     <>
@@ -74,12 +84,27 @@ export default function FeedbackPage() {
               {f.text && <p className="mt-2 text-sm text-slate-800">{f.text}</p>}
               {f.analysis ? (
                 <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+                  {f.analysis.safetySignal && <Badge tone="red">⚠ Safety signal</Badge>}
                   <SentimentBadge sentiment={f.analysis.sentiment} />
                   <PriorityBadge priority={f.analysis.priority} />
                   <Badge tone="blue">{humanize(f.analysis.category)}</Badge>
                   {f.analysis.topics.map((t) => <Badge key={t}>{humanize(t)}</Badge>)}
-                  <span className="text-xs text-slate-400">{f.analysis.engine === 'LLM' ? 'AI model' : 'rule engine'}</span>
+                  <span className="inline-flex items-center gap-1 text-xs text-slate-400">
+                    {f.analysis.aiPending ? (
+                      <>
+                        <Spinner className="h-3 w-3" /> Gemini is classifying…
+                      </>
+                    ) : (
+                      <>
+                        {ENGINE_LABEL[f.analysis.engine]}
+                        {f.analysis.model && ` · ${modelName(f.analysis.model)}`}
+                      </>
+                    )}
+                  </span>
                   {f.analysis.summary && <p className="w-full text-xs text-slate-500">{f.analysis.summary}</p>}
+                  {f.analysis.warnings.map((w) => (
+                    <p key={w} className="w-full text-xs text-amber-700">⚠ {w}</p>
+                  ))}
                 </div>
               ) : (
                 <p className="mt-3 text-xs text-slate-400">Analysis pending…</p>

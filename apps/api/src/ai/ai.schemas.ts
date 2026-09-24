@@ -54,11 +54,17 @@ export const FEEDBACK_TOPICS = [
   'treatment_quality',
 ] as const;
 
-export const FeedbackAnalysisSchema = z.object({
-  sentiment: z.enum(['POSITIVE', 'NEUTRAL', 'NEGATIVE']),
+/** Contract Gemini must satisfy for feedback classification (enums only + a capped summary). */
+export const GeminiFeedbackSchema = z.object({
   category: z.enum(FEEDBACK_CATEGORIES),
-  topics: z.array(z.enum(FEEDBACK_TOPICS)).max(5),
+  sentiment: z.enum(['POSITIVE', 'NEUTRAL', 'NEGATIVE']),
   priority: z.enum(LEVELS),
+  topics: z.array(z.enum(FEEDBACK_TOPICS)).max(5),
+  safetySignal: z.boolean(),
   summary: z.string().max(200),
 });
-export type FeedbackAnalysisResult = z.infer<typeof FeedbackAnalysisSchema>;
+export type GeminiFeedback = z.infer<typeof GeminiFeedbackSchema>;
+/** Shape stored for every feedback item, whichever engine produced it. */
+export type FeedbackAnalysisResult = GeminiFeedback;
+/** @deprecated kept for the smoke test name; same contract. */
+export const FeedbackAnalysisSchema = GeminiFeedbackSchema;

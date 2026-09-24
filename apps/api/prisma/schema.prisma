@@ -281,11 +281,19 @@ model FeedbackAnalysis {
   category   String
   topics     String[]
   priority   Priority
+  /// Patient-safety / integrity concern (bribery, abuse, negligence, threats, emergencies). Always HIGH priority.
+  safetySignal Boolean  @default(false)
   summary    String?
   engine     AiEngine
+  warnings   String[]  @default([])
+  provider   String?
+  model      String?
+  aiPending  Boolean   @default(false)
   createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @default(now()) @updatedAt
 
   @@index([sentiment])
+  @@index([aiPending])
 }
 
 model AuditLog {

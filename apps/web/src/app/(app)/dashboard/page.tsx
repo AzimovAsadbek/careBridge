@@ -5,13 +5,15 @@ import { useEffect } from 'react';
 import { useResource } from '@/lib/resource';
 import { errorMessage } from '@/lib/api';
 import { dueIn, humanize } from '@/lib/format';
-import type { Dashboard } from '@/lib/types';
+import type { AiStatus, Dashboard } from '@/lib/types';
+import { modelName } from '@/components/clinical';
 import { PriorityBadge, ReferralStatusBadge, RiskBadge } from '@/components/badges';
 import { AiDisclaimer } from '@/components/clinical';
 import { Card, CardTitle, ErrorState, Loading, PageHeader, Stat, cx } from '@/components/ui';
 
 export default function DashboardPage() {
   const { data, error, loading, reload } = useResource<Dashboard>('/analytics/dashboard');
+  const ai = useResource<AiStatus>('/ai/status');
 
   useEffect(() => {
     const t = setInterval(() => void reload(), 30_000);
@@ -71,7 +73,17 @@ export default function DashboardPage() {
 
         <div className="space-y-4">
           <Card>
-            <CardTitle>AI care coordinator</CardTitle>
+            <CardTitle
+              action={
+                ai.data && (
+                  <span className="text-xs font-medium text-slate-500">
+                    {ai.data.enabled ? `${modelName(ai.data.model)} + safety rules` : 'Rule engine'}
+                  </span>
+                )
+              }
+            >
+              AI care coordinator
+            </CardTitle>
             <ul className="space-y-2">
               {data.insights.map((i) => (
                 <li key={i} className="flex gap-2 text-sm text-slate-800">

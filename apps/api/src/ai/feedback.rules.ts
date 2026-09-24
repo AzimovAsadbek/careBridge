@@ -19,8 +19,24 @@ const TOPIC_LEXICON: Record<Topic, RegExp> = {
 
 const POSITIVE = /rahmat|minnatdor|yaxshi|zo['‘’`]?r|a['‘’`]?lo|спасибо|благодар|хорош|отличн|thank|great|excellent|good|kind/i;
 const NEGATIVE = /yomon|afsus|norozi|shikoyat|плох|ужасн|недовол|жалоб|bad|terrible|awful|complain|never again/i;
-const SAFETY = /xato dori|noto['‘’`]?g['‘’`]?ri dori|o['‘’`]?lim|o['‘’`]?ldi|zaharlan|неправильн.{0,10}лекарств|умер|смерт|отравл|wrong (medication|drug)|died|death|abuse|violence|urish|бил/i;
-const CORRUPTION = /pora|взятк|bribe|pul so['‘’`]?ra|деньги требов|asked for money/i;
+const A = "['‘’`ʻʼ]?"; // Uzbek apostrophe variants (o‘, g‘, ʼ)
+/** Patient safety: wrong treatment, negligence, deaths, abuse, threats, emergencies left unattended. */
+const SAFETY = new RegExp(
+  [
+    `xato dori`, `noto${A}g${A}ri dori`, `o${A}lim`, `o${A}ldi`, `zaharlan`, `beparvo`, `e${A}tiborsiz qoldir`,
+    `urdi`, `urishdi`, `haqorat`, `tahdid`, `qo${A}rqit`, `tez yordam kelmadi`, `hushidan ketdi`,
+    `неправильн.{0,10}лекарств`, `умер`, `смерт`, `отравл`, `халатн`, `ударил`, `избил`, `угрож`, `оскорб`, `без сознания`,
+    `wrong (medication|drug|dose)`, `died`, `death`, `abuse`, `violence`, `negligen`, `threat`, `hit me`, `assault`,
+    `unconscious`, `emergency`, `nobody came.{0,20}(bleed|breath|pain)`,
+  ].join('|'),
+  'i',
+);
+const CORRUPTION = new RegExp(`pora|взятк|bribe|pul so${A}ra|деньги требов|требовали деньги|asked for money|extort`, 'i');
+
+/** Keyword safety/integrity signal — the deterministic floor the AI can never lower. */
+export function hasSafetySignal(text: string | null | undefined) {
+  return !!text && (SAFETY.test(text) || CORRUPTION.test(text));
+}
 
 export function analyzeFeedbackByRules(input: { rating: number; type: FeedbackType; text?: string | null }): FeedbackAnalysisResult {
   const text = input.text ?? '';
@@ -54,5 +70,5 @@ export function analyzeFeedbackByRules(input: { rating: number; type: FeedbackTy
       ? `${sentiment.toLowerCase()} feedback about ${topics.map((t) => t.replace(/_/g, ' ')).join(', ')}`
       : `${sentiment.toLowerCase()} feedback (rating ${input.rating}/5)`;
 
-  return { sentiment, category, topics, priority, summary };
+  return { sentiment, category, topics, priority, safetySignal: isSafety || isCorruption, summary };
 }
