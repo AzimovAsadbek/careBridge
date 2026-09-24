@@ -11,6 +11,9 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { HealthController } from './health.controller';
+import { PatientsModule } from './patients/patients.module';
+import { ReferralsModule } from './referrals/referrals.module';
+import { FollowUpsModule } from './follow-ups/follow-ups.module';
 
 @Module({
   imports: [
@@ -21,6 +24,9 @@ import { HealthController } from './health.controller';
     AuthModule,
     UsersModule,
     FacilitiesModule,
+    PatientsModule,
+    ReferralsModule,
+    FollowUpsModule,
   ],
   controllers: [HealthController],
   providers: [
