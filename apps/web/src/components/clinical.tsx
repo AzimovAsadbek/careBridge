@@ -132,7 +132,7 @@ export function VitalsTable({ observations, pendingIds }: { observations: Observ
             <th className="px-2 py-2 font-medium">Pulse</th>
             <th className="px-2 py-2 font-medium">Temp</th>
             <th className="px-2 py-2 font-medium">SpO₂</th>
-            <th className="px-2 py-2 font-medium">Condition / symptoms</th>
+            <th className="min-w-56 px-2 py-2 font-medium">Condition / symptoms</th>
           </tr>
         </thead>
         <tbody>
@@ -153,7 +153,7 @@ export function VitalsTable({ observations, pendingIds }: { observations: Observ
                 <td className="px-2 py-2 tabular-nums">{o.pulse ?? '—'}</td>
                 <td className={cx('px-2 py-2 tabular-nums', (o.temperature ?? 0) >= 38 && 'font-semibold text-red-600')}>{o.temperature ?? '—'}</td>
                 <td className={cx('px-2 py-2 tabular-nums', o.spo2 != null && o.spo2 < 94 && 'font-semibold text-red-600')}>{o.spo2 != null ? `${o.spo2}%` : '—'}</td>
-                <td className="px-2 py-2 text-slate-700">
+                <td className="min-w-56 px-2 py-2 text-slate-700">
                   {o.generalCondition && <span className="font-medium">{humanize(o.generalCondition.toLowerCase())}</span>}
                   {o.symptoms.length > 0 && <span className="text-slate-500"> · {o.symptoms.join(', ')}</span>}
                   {o.notes && <p className="text-xs text-slate-500">{o.notes}</p>}
