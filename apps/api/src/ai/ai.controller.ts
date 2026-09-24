@@ -1,4 +1,5 @@
 import { Controller, Get, NotFoundException, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthUser, CurrentUser } from '../common/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { patientScope } from '../common/access/scopes';
@@ -21,6 +22,8 @@ export class AiController {
     return { provider: this.ai.name, model: this.ai.model, enabled: this.ai.enabled, ruleEngine: true };
   }
 
+  // Each call can reach the paid/limited AI API: keep manual re-assessment modest.
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('risk-assessment/:patientId')
   async assess(@CurrentUser() user: AuthUser, @Param('patientId', ParseUUIDPipe) patientId: string) {
     const visible = await this.prisma.patient.count({ where: { AND: [{ id: patientId }, patientScope(user)] } });

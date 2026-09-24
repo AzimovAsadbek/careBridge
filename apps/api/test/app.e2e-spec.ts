@@ -71,6 +71,31 @@ describe('CareBridge API (e2e)', () => {
       await http().get('/api/audit').set(as('nurse')).expect(403);
     });
 
+    it('keeps the staff directory from nurses and workflow fields from nurse edits', async () => {
+      await http().get('/api/users').set(as('nurse')).expect(403);
+      await http().get('/api/users?role=NURSE').set(as('familyDoctor')).expect(200);
+      const { patientId } = await dischargedWithFollowUp();
+      await http().patch(`/api/patients/${patientId}`).set(as('nurse')).send({ status: 'STABLE' }).expect(403);
+      await http().patch(`/api/patients/${patientId}`).set(as('nurse')).send({ familyDoctorId: ctx.users.otherDoctor.id }).expect(403);
+      await http().patch(`/api/patients/${patientId}`).set(as('nurse')).send({ phone: '+998 90 000 00 00' }).expect(200);
+    });
+
+    it('prevents cross-facility access to referrals and follow-ups', async () => {
+      const { referralId, followUpId } = await dischargedWithFollowUp();
+      await http().get(`/api/referrals/${referralId}`).set(as('otherDoctor')).expect(404);
+      await http().get(`/api/referrals/${referralId}`).set(as('otherNurse')).expect(404);
+      await http().post('/api/follow-ups').set(as('otherDoctor')).send({ referralId, assignedNurseId: ctx.users.otherNurse.id }).expect(404);
+      await http().patch(`/api/follow-ups/${followUpId}`).set(as('otherNurse')).send({ status: 'IN_PROGRESS' }).expect(404);
+      const list = await http().get('/api/referrals').set(as('otherDoctor')).expect(200);
+      expect(list.body.items.map((r: { id: string }) => r.id)).not.toContain(referralId);
+    });
+
+    it('never returns stack traces or internals in error bodies', async () => {
+      const res = await http().get('/api/patients/00000000-0000-4000-8000-000000000000').set(as('admin')).expect(404);
+      expect(Object.keys(res.body).sort()).toEqual(['error', 'message', 'path', 'statusCode', 'timestamp']);
+      expect(JSON.stringify(res.body)).not.toMatch(/stack|prisma|at \w+ \(/i);
+    });
+
     it('hides patients outside the caller scope (404, not 403)', async () => {
       const patientId = await createPatient();
       await http().get(`/api/patients/${patientId}`).set(as('nurse')).expect(404);

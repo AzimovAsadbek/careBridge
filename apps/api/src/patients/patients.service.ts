@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PatientStatus, Prisma, Priority, ReferralStatus, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -110,6 +110,10 @@ export class PatientsService {
 
   async update(user: AuthUser, id: string, dto: UpdatePatientDto) {
     await this.assertAccess(user, id);
+    // Care status and the responsible doctor change only through the clinical workflow.
+    if (user.role === Role.NURSE && (dto.status !== undefined || dto.familyDoctorId !== undefined)) {
+      throw new ForbiddenException('Nurses cannot change care status or the family doctor');
+    }
     if (dto.familyDoctorId) await this.assertDoctor(dto.familyDoctorId);
     const patient = await this.prisma.patient.update({
       where: { id },
