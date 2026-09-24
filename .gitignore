@@ -26,3 +26,4 @@ npm-debug.log*
 
 # generated PWA files
 apps/web/public/sw.js.map
+.claude/

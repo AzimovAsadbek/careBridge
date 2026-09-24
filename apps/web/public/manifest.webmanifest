@@ -1,0 +1,13 @@
+{
+  "name": "CareBridge AI",
+  "short_name": "CareBridge",
+  "description": "Offline-first continuity of care — hospital to home.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6f8fa",
+  "theme_color": "#0e7667",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
