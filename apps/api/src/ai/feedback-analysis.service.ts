@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { AiEngine, FeedbackType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { describeError } from '../common/filters/http-exception.filter';
-import { LlmProvider } from './llm.provider';
+import { AiProvider, asUntrustedData } from './ai-provider';
 import { FeedbackAnalysisResult, FeedbackAnalysisSchema } from './ai.schemas';
 import { analyzeFeedbackByRules } from './feedback.rules';
 
@@ -18,7 +18,7 @@ export class FeedbackAnalysisService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly llm: LlmProvider,
+    private readonly ai: AiProvider,
   ) {}
 
   async classify(input: { rating: number; type: FeedbackType; text?: string | null }): Promise<{
@@ -26,14 +26,15 @@ export class FeedbackAnalysisService {
     engine: AiEngine;
   }> {
     const rules = analyzeFeedbackByRules(input);
-    if (!this.llm.enabled || !input.text?.trim()) return { result: rules, engine: AiEngine.RULES };
+    if (!this.ai.enabled || !input.text?.trim()) return { result: rules, engine: AiEngine.RULES };
 
-    const llm = await this.llm.structured(
-      SYSTEM,
-      `Rating: ${input.rating}/5. Type: ${input.type}.\n<feedback>${input.text}</feedback>`,
-      FeedbackAnalysisSchema,
-    );
-    if (!llm) return { result: rules, engine: AiEngine.RULES };
+    const res = await this.ai.generate({
+      system: SYSTEM,
+      prompt: `Rating: ${input.rating}/5. Type: ${input.type}.\n${asUntrustedData('feedback', input.text)}`,
+      schema: FeedbackAnalysisSchema,
+    });
+    if (!res.ok) return { result: rules, engine: AiEngine.RULES };
+    const llm = res.data;
     // Safety net: keyword-detected safety/corruption signals are never downgraded by the model.
     if (rules.priority === 'HIGH' && llm.priority !== 'HIGH') llm.priority = 'HIGH';
     return { result: llm, engine: AiEngine.LLM };

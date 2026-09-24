@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { AiEngine, Observation, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { LlmProvider } from './llm.provider';
+import { AiProvider, asUntrustedData } from './ai-provider';
 import { RiskLlmReviewSchema, RiskResult } from './ai.schemas';
 import { assessRiskByRules, levelRank, maxLevel, RiskInput } from './risk.rules';
 
@@ -19,7 +19,7 @@ const ageFrom = (birthDate: Date, at = new Date()) =>
 export class RiskService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly llm: LlmProvider,
+    private readonly ai: AiProvider,
   ) {}
 
   /** Assess risk from the latest (or given) observation and persist the result. */
@@ -74,14 +74,15 @@ export class RiskService {
   /** Rules always run; the LLM may only escalate and add explained factors. */
   async evaluate(input: RiskInput): Promise<{ result: RiskResult; engine: AiEngine }> {
     const rules = assessRiskByRules(input);
-    if (!this.llm.enabled) return { result: rules, engine: AiEngine.RULES };
+    if (!this.ai.enabled) return { result: rules, engine: AiEngine.RULES };
 
-    const review = await this.llm.structured(
-      SYSTEM,
-      `<record>${JSON.stringify(input)}</record>\n<rule_result>${JSON.stringify(rules)}</rule_result>`,
-      RiskLlmReviewSchema,
-    );
-    if (!review) return { result: rules, engine: AiEngine.RULES };
+    const res = await this.ai.generate({
+      system: SYSTEM,
+      prompt: `${asUntrustedData('record', input)}\n${asUntrustedData('rule_result', rules)}`,
+      schema: RiskLlmReviewSchema,
+    });
+    if (!res.ok) return { result: rules, engine: AiEngine.RULES };
+    const review = res.data;
 
     const level = maxLevel(rules.riskLevel, review.riskLevel);
     const extra = review.additionalFactors.map((f, i) => ({ code: `ai_${i}`, label: f.label, weight: f.weight }));

@@ -1,10 +1,11 @@
 import { AiEngine } from '@prisma/client';
 import { RiskService } from './risk.service';
-import { LlmProvider } from './llm.provider';
+import { AiProvider } from './ai-provider';
 import { PrismaService } from '../prisma/prisma.service';
 
-function service(llm: Partial<LlmProvider>) {
-  return new RiskService({} as PrismaService, llm as LlmProvider);
+function service(llm: Partial<AiProvider> & { structured?: jest.Mock }) {
+  const generate = llm.structured ? jest.fn(async () => { const d = await llm.structured!(); return d ? { ok: true, data: d } : { ok: false, reason: 'malformed' }; }) : undefined;
+  return new RiskService({} as PrismaService, { ...llm, generate } as unknown as AiProvider);
 }
 
 const moderate = { ageYears: 68, spo2: 93, pulse: 104 }; // rules → MEDIUM

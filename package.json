@@ -1,7 +1,7 @@
 {
   "name": "carebridge",
   "private": true,
-  "description": "CareBridge AI \u2014 offline-first continuity of care platform",
+  "description": "CareBridge AI — offline-first continuity of care platform",
   "workspaces": [
     "apps/api",
     "apps/web"
@@ -26,6 +26,8 @@
     "prisma@6.19.3": true,
     "esbuild@0.28.2": true,
     "unrs-resolver@1.12.2": true,
-    "fsevents@2.3.3": true
+    "fsevents@2.3.3": true,
+    "@google/genai": false,
+    "protobufjs": false
   }
 }

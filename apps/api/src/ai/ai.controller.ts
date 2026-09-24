@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { patientScope } from '../common/access/scopes';
 import { AuditService } from '../audit/audit.service';
 import { RiskService } from './risk.service';
-import { LlmProvider } from './llm.provider';
+import { AiProvider } from './ai-provider';
 
 @Controller('ai')
 export class AiController {
@@ -12,12 +12,13 @@ export class AiController {
     private readonly risk: RiskService,
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-    private readonly llm: LlmProvider,
+    private readonly ai: AiProvider,
   ) {}
 
   @Get('status')
   status() {
-    return { llmEnabled: this.llm.enabled, ruleEngine: true };
+    // Model name only — never credentials.
+    return { provider: this.ai.name, model: this.ai.model, enabled: this.ai.enabled, ruleEngine: true };
   }
 
   @Post('risk-assessment/:patientId')
