@@ -1,17 +1,32 @@
-import type { Continuity, Observation, RiskAssessment } from '@/lib/types';
+import type { AiEngine, Continuity, Observation, RiskAssessment } from '@/lib/types';
 import { fmtDateTime, humanize } from '@/lib/format';
 import { RiskBadge } from './badges';
-import { Badge, Card, CardTitle, cx } from './ui';
+import { Badge, Card, CardTitle, Spinner, cx, type Tone } from './ui';
 
 export function AiDisclaimer({ className }: { className?: string }) {
   return (
     <p className={cx('text-xs text-slate-500', className)}>
-      AI-assisted risk prioritization — decision support, not a diagnosis. The responsible clinician makes the final decision.
+      AI-assisted risk prioritization (Gemini + deterministic safety rules) — decision support, not a diagnosis. AI can raise but
+      never lower a rule-based risk. The responsible clinician makes the final decision.
     </p>
   );
 }
 
+const ENGINE: Record<AiEngine, { label: string; tone: Tone }> = {
+  GEMINI: { label: 'Gemini AI · checked by safety rules', tone: 'brand' },
+  GEMINI_WITH_RULE_OVERRIDE: { label: 'Safety rules overrode Gemini', tone: 'amber' },
+  FALLBACK_RULE_ENGINE: { label: 'Rule engine · AI unavailable', tone: 'slate' },
+  RULE_ENGINE: { label: 'Rule engine', tone: 'slate' },
+};
+
+export function modelName(model: string | null) {
+  return model ? model.replace(/^gemini-/, 'Gemini ').replace(/-/g, ' ') : null;
+}
+
 export function RiskCard({ assessment, action }: { assessment: RiskAssessment | undefined; action?: React.ReactNode }) {
+  const engine = assessment && ENGINE[assessment.engine];
+  const ruleFactors = assessment?.factors.filter((f) => f.source !== 'ai') ?? [];
+  const aiFactors = assessment?.factors.filter((f) => f.source === 'ai') ?? [];
   return (
     <Card>
       <CardTitle action={action}>AI risk prioritization</CardTitle>
@@ -21,16 +36,34 @@ export function RiskCard({ assessment, action }: { assessment: RiskAssessment | 
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <RiskBadge level={assessment.level} />
-            <span className="text-xs text-slate-500">
-              score {assessment.score} · {assessment.engine === 'LLM' ? 'AI model + rules' : 'rule engine'} · {fmtDateTime(assessment.createdAt)}
-            </span>
+            {assessment.aiPending ? (
+              <Badge tone="blue">
+                <Spinner className="h-3 w-3" /> Gemini is reviewing…
+              </Badge>
+            ) : (
+              engine && <Badge tone={engine.tone}>{engine.label}</Badge>
+            )}
           </div>
-          {assessment.factors.length > 0 ? (
+          <p className="text-xs text-slate-500">
+            {fmtDateTime(assessment.updatedAt ?? assessment.createdAt)} · rule score {assessment.score}
+            {assessment.confidence != null && ` · AI confidence ${Math.round(assessment.confidence * 100)}%`}
+            {assessment.model && !assessment.aiPending && assessment.engine !== 'RULE_ENGINE' && ` · ${modelName(assessment.model)}`}
+          </p>
+          {assessment.aiPending && (
+            <p className="text-xs text-slate-500">Showing the rule-based result until the AI review completes.</p>
+          )}
+          {ruleFactors.length + aiFactors.length > 0 ? (
             <ul className="space-y-1.5">
-              {assessment.factors.map((f) => (
-                <li key={f.code + f.label} className="flex items-start justify-between gap-3 text-sm">
+              {ruleFactors.map((f) => (
+                <li key={`r-${f.code}-${f.label}`} className="flex items-start justify-between gap-3 text-sm">
                   <span className="text-slate-800">{f.label}</span>
                   <span className="shrink-0 text-xs font-semibold tabular-nums text-slate-400">+{f.weight}</span>
+                </li>
+              ))}
+              {aiFactors.map((f) => (
+                <li key={`a-${f.code}`} className="flex items-start justify-between gap-3 text-sm">
+                  <span className="text-slate-800">{f.label}</span>
+                  <Badge tone="brand" className="shrink-0">AI</Badge>
                 </li>
               ))}
             </ul>
@@ -38,8 +71,15 @@ export function RiskCard({ assessment, action }: { assessment: RiskAssessment | 
             <p className="text-sm text-slate-600">No risk factors detected in the latest data.</p>
           )}
           <div className={cx('rounded-lg px-3 py-2 text-sm font-medium', assessment.level === 'HIGH' ? 'bg-red-50 text-red-800' : assessment.level === 'MEDIUM' ? 'bg-amber-50 text-amber-900' : 'bg-emerald-50 text-emerald-800')}>
-            Suggested: {assessment.recommendedAction}
+            Suggested next step: {assessment.recommendedAction}
           </div>
+          {assessment.warnings.length > 0 && (
+            <ul className="space-y-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              {assessment.warnings.map((w) => (
+                <li key={w}>⚠ {w}</li>
+              ))}
+            </ul>
+          )}
           <AiDisclaimer />
         </div>
       )}

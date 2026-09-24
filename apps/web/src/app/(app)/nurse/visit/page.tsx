@@ -8,6 +8,7 @@ import { errorMessage } from '@/lib/api';
 import { age, dueIn } from '@/lib/format';
 import { queueFollowUpStatus, queueObservation, useOutbox } from '@/lib/outbox';
 import { getSyncEngine, useSyncState } from '@/lib/sync';
+import { usePollWhile } from '@/lib/poll';
 import type { GeneralCondition, NurseVisit, Observation, PatientDetail } from '@/lib/types';
 import type { OutboxOp } from '@/lib/db';
 import { PriorityBadge, RiskBadge } from '@/components/badges';
@@ -51,6 +52,8 @@ function Visit({ id }: { id: string }) {
   const [saved, setSaved] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  usePollWhile(sync.online && !!patient.data?.riskAssessments[0]?.aiPending, patient.reload);
 
   // A high-risk patient should not be closed as "stable" by default.
   const riskLevel = patient.data?.riskLevel ?? visit?.patient.riskLevel;

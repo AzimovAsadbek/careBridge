@@ -8,7 +8,7 @@ import { join } from 'path';
 import { ConfigService } from '@nestjs/config';
 import { GeminiProvider } from '../src/ai/gemini.provider';
 import { AiResult, RETRYABLE } from '../src/ai/ai-provider';
-import { FeedbackAnalysisSchema, RiskLlmReviewSchema } from '../src/ai/ai.schemas';
+import { FeedbackAnalysisSchema, GeminiRiskSchema } from '../src/ai/ai.schemas';
 
 const envFile = join(__dirname, '..', '.env');
 // Jest sandboxes process.env per file, so parse the file into it explicitly.
@@ -44,7 +44,7 @@ describe('Gemini live smoke test', () => {
     const res = await withRetry(() => provider().generate({
       system: 'Review a post-discharge home-visit record for risk. Decision support only; no diagnosis.',
       prompt: '<record>{"ageYears":75,"spo2":89,"symptoms":["shortness of breath"]}</record>',
-      schema: RiskLlmReviewSchema,
+      schema: GeminiRiskSchema,
     }));
     if (!res.ok) throw new Error(`Gemini call failed: ${res.reason}`);
     expect(res.data.riskLevel).toBe('HIGH');

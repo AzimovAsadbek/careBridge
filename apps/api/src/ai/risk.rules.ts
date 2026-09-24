@@ -24,7 +24,7 @@ const RED_FLAGS: { code: string; label: string; patterns: RegExp }[] = [
   { code: 'swelling', label: 'Oedema / swelling reported', patterns: /swelling|oedema|edema|shish|отек|отёк/i },
 ];
 
-const ACTIONS: Record<Level, string> = {
+export const RISK_ACTIONS: Record<Level, string> = {
   HIGH: 'Urgent physician review within 24 hours; consider re-hospitalisation assessment.',
   MEDIUM: 'Physician review within 72 hours; repeat vitals at next visit.',
   LOW: 'Continue routine follow-up plan.',
@@ -42,7 +42,7 @@ export function assessRiskByRules(input: RiskInput): RiskResult {
   const factors: RiskFactor[] = [];
   let critical = false;
   const add = (code: string, label: string, weight: number, isCritical = false) => {
-    factors.push({ code, label, weight });
+    factors.push({ code, label, weight, source: 'rule' });
     if (isCritical) critical = true;
   };
 
@@ -94,5 +94,5 @@ export function assessRiskByRules(input: RiskInput): RiskResult {
   if (critical) riskLevel = 'HIGH';
 
   factors.sort((a, b) => b.weight - a.weight);
-  return { riskLevel, score: Math.min(score, 40), factors, recommendedAction: ACTIONS[riskLevel] };
+  return { riskLevel, score: Math.min(score, 40), factors, recommendedAction: RISK_ACTIONS[riskLevel] };
 }

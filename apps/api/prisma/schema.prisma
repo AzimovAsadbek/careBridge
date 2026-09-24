@@ -58,9 +58,16 @@ enum GeneralCondition {
   CRITICAL
 }
 
+/// Which engine produced the stored result (see ai/risk.safety.ts).
 enum AiEngine {
-  RULES
-  LLM
+  /// Deterministic rules only (no AI provider configured).
+  RULE_ENGINE
+  /// Gemini result accepted (at or above the rule-based risk).
+  GEMINI
+  /// Gemini suggested a lower risk; the safety rules kept the higher level.
+  GEMINI_WITH_RULE_OVERRIDE
+  /// AI configured but unavailable (timeout, quota, malformed output) — rules used.
+  FALLBACK_RULE_ENGINE
 }
 
 enum FeedbackType {
@@ -235,9 +242,18 @@ model RiskAssessment {
   factors           Json
   recommendedAction String
   engine            AiEngine
+  /// Model self-reported confidence 0–1 (AI results only).
+  confidence        Float?
+  warnings          String[]     @default([])
+  provider          String?
+  model             String?
+  /// True while the rule-based result is shown and the AI review is still running.
+  aiPending         Boolean      @default(false)
   createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @default(now()) @updatedAt
 
   @@index([patientId, createdAt])
+  @@index([aiPending])
   @@index([level, createdAt])
 }
 

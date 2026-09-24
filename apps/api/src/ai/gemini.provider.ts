@@ -21,22 +21,37 @@ export function retryDelayMs(message: string | undefined): number | undefined {
   return m ? Math.ceil(Number(m[1]) * 1000) : undefined;
 }
 
+/** Per-day quota exhaustion (free tier: 20 requests/day/model) — skip the model for a while. */
+const DAILY_QUOTA = /PerDay/i;
+const DAILY_COOLDOWN_MS = 60 * 60_000;
+
+type Attempt<T> = AiResult<T> & { cooldownMs?: number };
+
 /**
  * Server-side Gemini provider. The API key is read once from the environment and is never
  * logged, returned or sent anywhere except the Gemini API request header.
+ *
+ * Models are tried in order: GEMINI_MODEL, then GEMINI_FALLBACK_MODELS (comma-separated).
+ * A model is skipped temporarily after quota exhaustion or when it does not exist.
  */
 @Injectable()
 export class GeminiProvider extends AiProvider {
   readonly name = 'gemini';
   readonly model: string;
+  readonly fallbackModels: string[];
   private readonly logger = new Logger(GeminiProvider.name);
   private readonly client: GoogleGenAI | null;
   private readonly timeoutMs: number;
+  private readonly cooldownUntil = new Map<string, number>();
 
   constructor(config: ConfigService, @Optional() @Inject(GEMINI_FETCH) fetchImpl?: typeof fetch) {
     super();
     const apiKey = config.get<string>('GEMINI_API_KEY')?.trim();
     this.model = config.get<string>('GEMINI_MODEL')?.trim() || DEFAULT_GEMINI_MODEL;
+    this.fallbackModels = (config.get<string>('GEMINI_FALLBACK_MODELS') ?? '')
+      .split(',')
+      .map((m) => m.trim())
+      .filter((m) => m && m !== this.model);
     this.timeoutMs = Number(config.get('AI_TIMEOUT_MS') ?? 20_000);
     this.client = apiKey
       ? new GoogleGenAI({
@@ -57,21 +72,41 @@ export class GeminiProvider extends AiProvider {
   }
 
   async generate<T extends z.ZodType>(req: StructuredRequest<T>): Promise<AiResult<z.infer<T>>> {
-    const meta = { provider: this.name, model: this.model };
-    if (!this.client) return { ok: false, reason: 'not_configured', ...meta };
+    if (!this.client) return { ok: false, reason: 'not_configured', provider: this.name, model: this.model };
+    const now = Date.now();
+    const models = [this.model, ...this.fallbackModels];
+    const available = models.filter((m) => (this.cooldownUntil.get(m) ?? 0) <= now);
+    if (available.length === 0) {
+      const soonest = Math.min(...models.map((m) => this.cooldownUntil.get(m) ?? now));
+      return { ok: false, reason: 'quota', provider: this.name, model: this.model, retryAfterMs: soonest - now };
+    }
 
+    let last: Attempt<z.infer<T>> | undefined;
+    for (const model of available) {
+      last = await this.attempt(model, req);
+      if (last.ok) return last;
+      if (last.cooldownMs) this.cooldownUntil.set(model, Date.now() + last.cooldownMs);
+      // Only capacity problems move on to the next model; bad output or bad requests do not.
+      if (!(last.reason === 'quota' || last.reason === 'unavailable' || last.cooldownMs)) break;
+    }
+    delete last!.cooldownMs;
+    return last!;
+  }
+
+  private async attempt<T extends z.ZodType>(model: string, req: StructuredRequest<T>): Promise<Attempt<z.infer<T>>> {
+    const meta = { provider: this.name, model };
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     const started = Date.now();
-    const fail = (reason: AiFailureReason, detail = '', retryAfterMs?: number): AiResult<z.infer<T>> => {
+    const fail = (reason: AiFailureReason, detail = '', extra: { retryAfterMs?: number; cooldownMs?: number } = {}): Attempt<z.infer<T>> => {
       // Only the reason and a status/finish code — never prompts, outputs or error messages.
-      this.logger.warn(`Gemini call failed: reason=${reason}${detail ? ` ${detail}` : ''} model=${this.model}`);
-      return { ok: false, reason, ...meta, ...(retryAfterMs ? { retryAfterMs } : {}) };
+      this.logger.warn(`Gemini call failed: reason=${reason}${detail ? ` ${detail}` : ''} model=${model}`);
+      return { ok: false, reason, ...meta, ...extra };
     };
 
     try {
-      const res = await this.client.models.generateContent({
-        model: this.model,
+      const res = await this.client!.models.generateContent({
+        model,
         contents: [{ role: 'user', parts: [{ text: req.prompt }] }],
         config: {
           systemInstruction: req.system,
@@ -103,7 +138,15 @@ export class GeminiProvider extends AiProvider {
     } catch (e) {
       if (controller.signal.aborted) return fail('timeout');
       if (e instanceof ApiError) {
-        if (e.status === 429) return fail('quota', 'status=429', retryDelayMs(e.message));
+        if (e.status === 429) {
+          const daily = DAILY_QUOTA.test(e.message);
+          const retryAfterMs = retryDelayMs(e.message);
+          return fail('quota', `status=429${daily ? ' daily' : ''}`, {
+            retryAfterMs,
+            cooldownMs: daily ? DAILY_COOLDOWN_MS : retryAfterMs,
+          });
+        }
+        if (e.status === 404) return fail('error', 'status=404 model-not-found', { cooldownMs: DAILY_COOLDOWN_MS });
         if (e.status === 408 || e.status === 504) return fail('timeout', `status=${e.status}`);
         if (e.status >= 500) return fail('unavailable', `status=${e.status}`);
         return fail('error', `status=${e.status}`);

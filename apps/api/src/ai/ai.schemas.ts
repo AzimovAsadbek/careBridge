@@ -5,8 +5,10 @@ export type Level = (typeof LEVELS)[number];
 
 export const RiskFactorSchema = z.object({
   code: z.string().max(40),
-  label: z.string().max(160),
+  label: z.string().max(200),
   weight: z.number().int().min(0).max(5),
+  /** 'rule' = deterministic engine (weighted); 'ai' = Gemini reason (explanatory, unweighted). */
+  source: z.enum(['rule', 'ai']).optional(),
 });
 export type RiskFactor = z.infer<typeof RiskFactorSchema>;
 
@@ -18,15 +20,15 @@ export const RiskResultSchema = z.object({
 });
 export type RiskResult = z.infer<typeof RiskResultSchema>;
 
-/** What the LLM is allowed to add on top of the rule engine. */
-export const RiskLlmReviewSchema = z.object({
+/** Contract Gemini must satisfy for risk review. Anything else is rejected → rule fallback. */
+export const GeminiRiskSchema = z.object({
   riskLevel: z.enum(LEVELS),
-  additionalFactors: z
-    .array(z.object({ label: z.string().max(160), weight: z.number().int().min(1).max(3) }))
-    .max(5),
-  recommendedAction: z.string().max(300),
+  reasons: z.array(z.string().min(1).max(200)).max(6),
+  recommendedAction: z.string().min(1).max(300),
+  confidence: z.number().min(0).max(1),
+  warnings: z.array(z.string().min(1).max(200)).max(5),
 });
-export type RiskLlmReview = z.infer<typeof RiskLlmReviewSchema>;
+export type GeminiRisk = z.infer<typeof GeminiRiskSchema>;
 
 export const FEEDBACK_CATEGORIES = [
   'service_quality',

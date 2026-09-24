@@ -7,6 +7,7 @@ import { api, errorMessage } from '@/lib/api';
 import { useResource } from '@/lib/resource';
 import { age, dueIn, fmtDate, fmtDateTime } from '@/lib/format';
 import { session } from '@/lib/session';
+import { usePollWhile } from '@/lib/poll';
 import type { PatientDetail } from '@/lib/types';
 import { FollowUpStatusBadge, PatientStatusBadge, PriorityBadge, ReferralStatusBadge, RiskBadge } from '@/components/badges';
 import { ContinuityCard, RiskCard, VitalsTable } from '@/components/clinical';
@@ -21,6 +22,7 @@ export default function PatientDetailPage() {
   const [assessing, setAssessing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const role = session.user?.role;
+  usePollWhile(!!p?.riskAssessments[0]?.aiPending, reload);
 
   if (error) return <ErrorState message={errorMessage(error)} onRetry={reload} />;
   if (loading && !p) return <Loading />;

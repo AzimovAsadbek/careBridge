@@ -194,7 +194,8 @@ describe('CareBridge API (e2e)', () => {
       await http().post(`/api/patients/${patientId}/observations`).set(as('familyDoctor')).send({ temperature: 38.4, pulse: 104 }).expect(201);
       const res = await http().post(`/api/ai/risk-assessment/${patientId}`).set(as('familyDoctor')).expect(201);
       expect(['LOW', 'MEDIUM', 'HIGH']).toContain(res.body.level);
-      expect(res.body.engine).toBe('RULES');
+      expect(res.body.engine).toBe('RULE_ENGINE');
+      expect(res.body.aiPending).toBe(false);
       expect(res.body.factors.length).toBeGreaterThan(0);
       await http().post(`/api/ai/risk-assessment/${patientId}`).set(as('otherNurse')).expect(404);
     });

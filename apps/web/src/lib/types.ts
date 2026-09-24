@@ -56,7 +56,10 @@ export interface RiskFactor {
   code: string;
   label: string;
   weight: number;
+  source?: 'rule' | 'ai';
 }
+
+export type AiEngine = 'RULE_ENGINE' | 'GEMINI' | 'GEMINI_WITH_RULE_OVERRIDE' | 'FALLBACK_RULE_ENGINE';
 
 export interface RiskAssessment {
   id: string;
@@ -64,8 +67,14 @@ export interface RiskAssessment {
   score: number;
   factors: RiskFactor[];
   recommendedAction: string;
-  engine: 'RULES' | 'LLM';
+  engine: AiEngine;
+  confidence: number | null;
+  warnings: string[];
+  provider: string | null;
+  model: string | null;
+  aiPending: boolean;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface FollowUp {

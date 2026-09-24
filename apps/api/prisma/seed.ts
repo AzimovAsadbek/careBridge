@@ -86,7 +86,7 @@ async function main() {
       data: { patientId: dilshod.id, followUpId: dFu.id, recordedById: nurseId, systolic: 132, diastolic: 84, pulse: 74, temperature: 36.6, spo2: 97, symptoms: [], generalCondition: 'GOOD', recordedAt: ago(10), syncedFromOffline: true },
     });
     await prisma.riskAssessment.create({
-      data: { patientId: dilshod.id, observationId: obs.id, level: Priority.LOW, score: 0, factors: [], recommendedAction: 'Continue routine follow-up plan.', engine: 'RULES' },
+      data: { patientId: dilshod.id, observationId: obs.id, level: Priority.LOW, score: 0, factors: [], recommendedAction: 'Continue routine follow-up plan.', engine: 'RULE_ENGINE' },
     });
     void hospitalDoctorId;
   }
@@ -105,7 +105,7 @@ async function main() {
         data: { facilityId: f.facilityId, ward: f.ward, rating: f.rating, type: f.type, text: f.text, createdAt: ago(f.daysAgo) },
       });
       const a = analyzeFeedbackByRules(f);
-      await prisma.feedbackAnalysis.create({ data: { feedbackId: fb.id, ...a, engine: 'RULES' } });
+      await prisma.feedbackAnalysis.create({ data: { feedbackId: fb.id, ...a, engine: 'RULE_ENGINE' } });
     }
   }
 
