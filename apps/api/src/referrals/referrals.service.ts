@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleDes
 import { Prisma, ReferralStatus, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { describeError } from '../common/filters/http-exception.filter';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { referralScope } from '../common/access/scopes';
 import { ListReferralsQuery } from './dto/referral.dto';
@@ -25,7 +26,7 @@ export class ReferralsService implements OnModuleInit, OnModuleDestroy {
   onModuleInit() {
     if (process.env.NODE_ENV === 'test') return;
     this.timer = setInterval(() => {
-      this.markOverdue().catch((e) => this.logger.warn(`Overdue sweep failed: ${(e as Error).message}`));
+      this.markOverdue().catch((e) => this.logger.warn(`Overdue sweep failed: ${describeError(e)}`));
     }, OVERDUE_SWEEP_MS);
   }
 

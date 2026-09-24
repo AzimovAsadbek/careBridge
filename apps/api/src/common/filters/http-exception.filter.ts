@@ -2,6 +2,24 @@ import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logge
 import { Prisma } from '@prisma/client';
 import { Request, Response } from 'express';
 
+/**
+ * Log-safe description of an error. Prisma error messages embed the full query including
+ * patient data, so only their class and code are logged; other messages are truncated.
+ */
+export function describeError(exception: unknown): string {
+  if (exception instanceof Prisma.PrismaClientKnownRequestError) return `Prisma ${exception.code}`;
+  if (
+    exception instanceof Prisma.PrismaClientValidationError ||
+    exception instanceof Prisma.PrismaClientUnknownRequestError ||
+    exception instanceof Prisma.PrismaClientRustPanicError ||
+    exception instanceof Prisma.PrismaClientInitializationError
+  ) {
+    return exception.name;
+  }
+  const err = exception as Error | undefined;
+  return `${err?.name ?? 'Error'}: ${String(err?.message ?? '').slice(0, 200)}`;
+}
+
 /** Uniform error body; never leaks stack traces or SQL to clients. */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -33,9 +51,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
 
     if (status >= 500) {
-      // Log only the error name/message and route — never request bodies (may contain PHI).
-      const err = exception as Error;
-      this.logger.error(`${req.method} ${req.path} → ${err?.name}: ${err?.message}`);
+      this.logger.error(`${req.method} ${req.route?.path ?? req.path} → ${describeError(exception)}`);
     }
 
     res.status(status).json({

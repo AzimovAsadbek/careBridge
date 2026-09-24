@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { describeError } from '../common/filters/http-exception.filter';
 
 export interface AuditEntry {
   actorId?: string | null;
@@ -22,7 +23,7 @@ export class AuditService {
       await (tx ?? this.prisma).auditLog.create({ data: entry });
     } catch (e) {
       // Auditing must never break the clinical workflow.
-      this.logger.warn(`Audit write failed for ${entry.action}: ${(e as Error).message}`);
+      this.logger.warn(`Audit write failed for ${entry.action}: ${describeError(e)}`);
     }
   }
 

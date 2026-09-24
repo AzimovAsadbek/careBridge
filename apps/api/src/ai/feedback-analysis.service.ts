@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AiEngine, FeedbackType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { describeError } from '../common/filters/http-exception.filter';
 import { LlmProvider } from './llm.provider';
 import { FeedbackAnalysisResult, FeedbackAnalysisSchema } from './ai.schemas';
 import { analyzeFeedbackByRules } from './feedback.rules';
@@ -51,6 +52,6 @@ export class FeedbackAnalysisService {
 
   /** Fire-and-forget variant for the public endpoint; failures are logged, never surfaced. */
   analyzeInBackground(feedbackId: string) {
-    this.analyzeAndStore(feedbackId).catch((e) => this.logger.warn(`Feedback analysis failed: ${(e as Error).message}`));
+    this.analyzeAndStore(feedbackId).catch((e) => this.logger.warn(`Feedback analysis failed: ${describeError(e)}`));
   }
 }
