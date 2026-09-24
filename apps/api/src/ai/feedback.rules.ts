@@ -39,7 +39,7 @@ export function analyzeFeedbackByRules(input: { rating: number; type: FeedbackTy
   let category: FeedbackAnalysisResult['category'] = 'other';
   if (isCorruption) category = 'corruption';
   else if (isSafety) category = 'clinical_safety';
-  else if (sentiment === 'POSITIVE' && input.type !== FeedbackType.COMPLAINT) category = 'praise';
+  else if (sentiment === 'POSITIVE' && (input.type === FeedbackType.PRAISE || input.type === FeedbackType.OTHER)) category = 'praise';
   else if (topics.includes('staff_attitude')) category = 'staff_behavior';
   else if (topics.includes('cleanliness')) category = 'cleanliness';
   else if (topics.includes('facilities') || topics.includes('food')) category = 'infrastructure';

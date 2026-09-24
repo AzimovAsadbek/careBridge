@@ -26,6 +26,12 @@ describe('analyzeFeedbackByRules', () => {
     expect(r.priority).toBe('LOW');
   });
 
+  it('does not classify a positively-worded suggestion as praise', () => {
+    const r = analyzeFeedbackByRules({ rating: 3, type: 'SUGGESTION', text: 'Navbat tizimi elektron bo‘lsa yaxshi bo‘lardi.' });
+    expect(r.category).toBe('service_quality');
+    expect(r.topics).toContain('waiting_time');
+  });
+
   it('handles rating-only feedback and hostile markup safely', () => {
     const r = analyzeFeedbackByRules({ rating: 3, type: 'OTHER', text: '<script>alert(1)</script>' });
     expect(r.sentiment).toBe('NEUTRAL');
