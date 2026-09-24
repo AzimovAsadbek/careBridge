@@ -6,6 +6,8 @@ import { AuthUser } from '../common/decorators/current-user.decorator';
 import { followUpScope, referralScope } from '../common/access/scopes';
 import { CreateFollowUpDto, UpdateFollowUpDto } from './dto/follow-up.dto';
 
+const STATUS_RANK: Record<FollowUpStatus, number> = { SCHEDULED: 0, IN_PROGRESS: 1, COMPLETED: 2 };
+
 const TRANSITIONS: Record<FollowUpStatus, FollowUpStatus[]> = {
   SCHEDULED: [FollowUpStatus.IN_PROGRESS, FollowUpStatus.COMPLETED],
   IN_PROGRESS: [FollowUpStatus.COMPLETED],
@@ -80,7 +82,7 @@ export class FollowUpsService {
     if (!followUp) throw new NotFoundException('Follow-up not found');
 
     // Replayed offline op: already in (or past) the requested state → no-op.
-    if (followUp.status === dto.status) return followUp;
+    if (STATUS_RANK[followUp.status] >= STATUS_RANK[dto.status]) return followUp;
     if (!TRANSITIONS[followUp.status].includes(dto.status)) {
       throw new BadRequestException(`Cannot move follow-up from ${followUp.status} to ${dto.status}`);
     }
