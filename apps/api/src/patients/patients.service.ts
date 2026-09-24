@@ -5,6 +5,7 @@ import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { patientScope } from '../common/access/scopes';
 import { Paginated } from '../common/pagination';
+import { computeContinuity } from '../continuity/continuity';
 import { CreatePatientDto, DischargeDto, ListPatientsQuery, UpdatePatientDto } from './dto/patient.dto';
 
 const FOLLOW_UP_DAYS: Record<Priority, number> = { HIGH: 2, MEDIUM: 7, LOW: 14 };
@@ -60,7 +61,7 @@ export class PatientsService {
 
   async get(user: AuthUser, id: string) {
     await this.assertAccess(user, id);
-    return this.prisma.patient.findUniqueOrThrow({
+    const patient = await this.prisma.patient.findUniqueOrThrow({
       where: { id },
       include: {
         facility: { select: { id: true, name: true, type: true } },
@@ -78,13 +79,18 @@ export class PatientsService {
             assignedDoctor: { select: { id: true, fullName: true } },
             followUps: {
               orderBy: { createdAt: 'desc' },
-              include: { assignedNurse: { select: { id: true, fullName: true } } },
+              include: {
+                assignedNurse: { select: { id: true, fullName: true } },
+                _count: { select: { observations: true } },
+              },
             },
           },
         },
         riskAssessments: { orderBy: { createdAt: 'desc' }, take: 5 },
       },
     });
+    const latest = patient.referrals[0];
+    return { ...patient, continuity: computeContinuity(latest) };
   }
 
   async create(user: AuthUser, dto: CreatePatientDto) {

@@ -15,6 +15,9 @@ import { PatientsModule } from './patients/patients.module';
 import { ReferralsModule } from './referrals/referrals.module';
 import { FollowUpsModule } from './follow-ups/follow-ups.module';
 import { AiModule } from './ai/ai.module';
+import { SyncModule } from './sync/sync.module';
+import { FeedbackModule } from './feedback/feedback.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
@@ -29,6 +32,9 @@ import { AiModule } from './ai/ai.module';
     ReferralsModule,
     FollowUpsModule,
     AiModule,
+    SyncModule,
+    FeedbackModule,
+    AnalyticsModule,
   ],
   controllers: [HealthController],
   providers: [
