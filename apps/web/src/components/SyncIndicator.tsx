@@ -25,27 +25,39 @@ export function SyncIndicator({ compact = false }: { compact?: boolean }) {
   let tone = 'bg-emerald-50 text-emerald-800 ring-emerald-200';
   let dot = 'bg-emerald-500';
   let label = 'Online · all changes synced';
+  let short = 'Online';
   if (!s.online) {
     tone = 'bg-amber-50 text-amber-900 ring-amber-300';
     dot = 'bg-amber-500';
     label = queued ? `Offline · ${queued} change${queued > 1 ? 's' : ''} saved on device` : 'Offline · working locally';
+    short = queued ? `Offline · ${queued} unsynced` : 'Offline';
   } else if (s.syncing) {
     tone = 'bg-sky-50 text-sky-800 ring-sky-200';
     dot = 'bg-sky-500 animate-pulse';
     label = `Syncing ${queued} change${queued === 1 ? '' : 's'}…`;
+    short = 'Syncing…';
   } else if (queued) {
     tone = 'bg-amber-50 text-amber-900 ring-amber-300';
     dot = 'bg-amber-500';
     label = `${queued} change${queued > 1 ? 's' : ''} waiting to sync`;
+    short = `${queued} to sync`;
   } else if (s.lastSyncAt) {
     label = `Online · synced ${ago(s.lastSyncAt)}`;
+    short = 'Synced';
   }
 
   return (
     <div className="flex items-center gap-2" aria-live="polite">
       <span className={cx('inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset', tone)}>
         <span className={cx('h-2 w-2 rounded-full', dot)} aria-hidden />
-        <span className={compact ? 'max-w-40 truncate sm:max-w-none' : ''}>{label}</span>
+        {compact ? (
+          <>
+            <span className="sm:hidden">{short}</span>
+            <span className="hidden sm:inline">{label}</span>
+          </>
+        ) : (
+          label
+        )}
       </span>
       {s.online && s.failed > 0 && !s.syncing && (
         <button onClick={() => void getSyncEngine().retryNow()} className="text-xs font-semibold text-brand-700 underline">

@@ -111,7 +111,7 @@ function Visit({ id }: { id: string }) {
       await queueObservation(visit!.patient.id, id, payload);
       setVitals(emptyVitals);
       setSymptoms([]);
-      setSaved(sync.online ? 'Saved — syncing now.' : 'Saved on this device. It will sync automatically when the connection returns.');
+      setSaved('Saved on this device. It syncs to the server automatically — see the status at the top.');
     } catch {
       setFormError('Could not save on this device. Check browser storage settings.');
     } finally {
@@ -124,7 +124,7 @@ function Visit({ id }: { id: string }) {
     setSaving(true);
     try {
       await queueFollowUpStatus(id, visit!.patient.id, { status: 'COMPLETED', outcome: outcome.trim() || undefined, patientStatus });
-      setSaved(sync.online ? 'Visit completed — syncing now.' : 'Visit completion saved on this device. It will sync when online.');
+      setSaved('Visit completion saved on this device. It syncs to the server automatically.');
     } finally {
       setSaving(false);
     }
@@ -163,7 +163,7 @@ function Visit({ id }: { id: string }) {
         )}
       </Card>
 
-      {saved && <Alert tone={sync.online ? 'green' : 'amber'} action={<button className="text-xs font-semibold underline" onClick={() => setSaved(null)}>Dismiss</button>}>{saved}</Alert>}
+      {saved && <Alert tone="green" action={<button className="text-xs font-semibold underline" onClick={() => setSaved(null)}>Dismiss</button>}>{saved}</Alert>}
       {rejected.map((op) => (
         <Alert
           key={op.localOperationId}
