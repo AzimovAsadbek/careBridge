@@ -71,7 +71,7 @@ export default function PublicFeedbackPage() {
       ) : state === 'sent' ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-6 text-center">
           <p className="text-lg font-semibold text-emerald-800">Thank you! · Rahmat!</p>
-          <p className="mt-1 text-sm text-emerald-700">Your anonymous feedback was received and will be reviewed by the hospital administration.</p>
+          <p className="mt-1 text-sm text-emerald-700">Your anonymous feedback was received and will be reviewed by the facility administration.</p>
         </div>
       ) : (
         <form onSubmit={submit} className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">

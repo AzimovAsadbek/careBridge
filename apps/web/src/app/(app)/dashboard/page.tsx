@@ -73,17 +73,14 @@ export default function DashboardPage() {
 
         <div className="space-y-4">
           <Card>
-            <CardTitle
-              action={
-                ai.data && (
-                  <span className="text-xs font-medium text-slate-500">
-                    {ai.data.enabled ? `${modelName(ai.data.model)} + safety rules` : 'Rule engine'}
-                  </span>
-                )
-              }
-            >
-              AI care coordinator
-            </CardTitle>
+            <CardTitle>AI care coordinator</CardTitle>
+            {ai.data && (
+              <p className="-mt-2 mb-3 text-xs text-slate-500">
+                {ai.data.enabled
+                  ? `${modelName(ai.data.model)}${ai.data.fallbackModels.length ? ` (fallback: ${ai.data.fallbackModels.map(modelName).join(', ')})` : ''} + deterministic safety rules`
+                  : 'Deterministic rule engine (AI not configured)'}
+              </p>
+            )}
             <ul className="space-y-2">
               {data.insights.map((i) => (
                 <li key={i} className="flex gap-2 text-sm text-slate-800">

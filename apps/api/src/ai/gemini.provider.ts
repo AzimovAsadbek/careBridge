@@ -38,7 +38,7 @@ type Attempt<T> = AiResult<T> & { cooldownMs?: number };
 export class GeminiProvider extends AiProvider {
   readonly name = 'gemini';
   readonly model: string;
-  readonly fallbackModels: string[];
+  override readonly fallbackModels: string[];
   private readonly logger = new Logger(GeminiProvider.name);
   private readonly client: GoogleGenAI | null;
   private readonly timeoutMs: number;

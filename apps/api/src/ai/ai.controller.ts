@@ -19,7 +19,7 @@ export class AiController {
   @Get('status')
   status() {
     // Model name only — never credentials.
-    return { provider: this.ai.name, model: this.ai.model, enabled: this.ai.enabled, ruleEngine: true };
+    return { provider: this.ai.name, model: this.ai.model, fallbackModels: this.ai.fallbackModels, enabled: this.ai.enabled, ruleEngine: true };
   }
 
   // Each call can reach the paid/limited AI API: keep manual re-assessment modest.

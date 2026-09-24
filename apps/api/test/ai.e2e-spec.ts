@@ -70,7 +70,7 @@ describe('AI provider boundary (e2e)', () => {
 
   it('never exposes the key via the status endpoint', async () => {
     const res = await http().get('/api/ai/status').set(as('admin')).expect(200);
-    expect(res.body).toEqual({ provider: 'gemini', model: 'gemini-3.8-flash', enabled: true, ruleEngine: true });
+    expect(res.body).toEqual({ provider: 'gemini', model: 'gemini-3.8-flash', fallbackModels: ['gemini-3.5-flash'], enabled: true, ruleEngine: true });
     expect(JSON.stringify(res.body)).not.toContain(FAKE_KEY);
   });
 

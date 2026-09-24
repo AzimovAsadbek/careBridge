@@ -248,6 +248,7 @@ export interface Dashboard {
 export interface AiStatus {
   provider: string;
   model: string;
+  fallbackModels: string[];
   enabled: boolean;
   ruleEngine: boolean;
 }

@@ -30,6 +30,8 @@ export interface StructuredRequest<T extends z.ZodType> {
 export abstract class AiProvider {
   abstract readonly name: string;
   abstract readonly model: string;
+  /** Models tried after `model` on quota / capacity problems (may be empty). */
+  readonly fallbackModels: string[] = [];
   abstract get enabled(): boolean;
   abstract generate<T extends z.ZodType>(request: StructuredRequest<T>): Promise<AiResult<z.infer<T>>>;
 }
