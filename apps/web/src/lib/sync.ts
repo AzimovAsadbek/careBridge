@@ -1,7 +1,7 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
-import { api, API_URL, NetworkError } from './api';
+import { api, ApiError, API_URL, NetworkError } from './api';
 import { getDb } from './db';
 import { SyncEngine, type SyncResult, type SyncState } from './sync-engine';
 
@@ -22,7 +22,18 @@ export function getSyncEngine() {
           return false;
         }
       },
-      send: async (operations) => (await api<{ results: SyncResult[] }>('/sync/batch', { method: 'POST', body: { operations } })).results,
+      send: async (operations) => {
+        try {
+          return (await api<{ results: SyncResult[] }>('/sync/batch', { method: 'POST', body: { operations } })).results;
+        } catch (e) {
+          // Permanent refusals would never succeed on retry: surface them as rejected ops.
+          // 401 (expired session) is rethrown so the work stays queued until the user signs in again.
+          if (e instanceof ApiError && [400, 403, 413].includes(e.status)) {
+            return operations.map((op) => ({ localOperationId: op.localOperationId, status: 'rejected' as const, error: e.message }));
+          }
+          throw e;
+        }
+      },
     });
   }
   return g.__carebridgeSync;
