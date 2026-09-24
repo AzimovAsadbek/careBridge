@@ -41,8 +41,10 @@ export class AiJobs implements OnModuleDestroy {
   /** Waits until no job is running or scheduled (used by tests and graceful shutdown). */
   async idle(timeoutMs = 30_000) {
     const until = Date.now() + timeoutMs;
+    // Poll with a real timer: awaiting already-settled promises would spin the microtask
+    // queue and starve the event loop (scheduled retries and I/O would never run).
     while ((this.active.size || this.timers.size) && Date.now() < until) {
-      await Promise.race([Promise.all(this.active.values()), new Promise((r) => setTimeout(r, 20))]);
+      await new Promise((r) => setTimeout(r, 20));
     }
   }
 
