@@ -45,10 +45,10 @@ export default function FeedbackPage() {
       </Card>
 
       <div className="mb-4 flex flex-wrap gap-2">
-        <Select className="w-auto" value={sentiment} onChange={(e) => { setSentiment(e.target.value as Sentiment | ''); setPage(1); }} aria-label="Filter by sentiment">
+        <Select className="sm:w-48" value={sentiment} onChange={(e) => { setSentiment(e.target.value as Sentiment | ''); setPage(1); }} aria-label="Filter by sentiment">
           <option value="">All sentiment</option><option value="NEGATIVE">Negative</option><option value="NEUTRAL">Neutral</option><option value="POSITIVE">Positive</option>
         </Select>
-        <Select className="w-auto" value={priority} onChange={(e) => { setPriority(e.target.value as Priority | ''); setPage(1); }} aria-label="Filter by priority">
+        <Select className="sm:w-48" value={priority} onChange={(e) => { setPriority(e.target.value as Priority | ''); setPage(1); }} aria-label="Filter by priority">
           <option value="">All priorities</option><option value="HIGH">High</option><option value="MEDIUM">Medium</option><option value="LOW">Low</option>
         </Select>
         <Button variant="secondary" onClick={() => void reload()}>Refresh</Button>
