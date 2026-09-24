@@ -56,6 +56,31 @@ describe('applyRiskSafetyLayer — AI may never lower a safety risk', () => {
     expect(r.warnings.some((w) => /medication or dosing/.test(w))).toBe(true);
   });
 
+  it('strips diagnostic conclusions but keeps the clinical signal', () => {
+    const r = applyRiskSafetyLayer(
+      high,
+      gemini({
+        riskLevel: 'HIGH',
+        reasons: [
+          "Uzbek notes report orthopnea ('cannot sleep at night'), strongly suggesting acute decompensated heart failure.",
+          'Likely pneumonia given fever and cough.',
+          'SpO2 fell from 94% to 89% since the last visit.',
+        ],
+        recommendedAction: 'Urgent physician review within 2-4 hours; consider re-hospitalisation for suspected acute heart failure.',
+      }),
+      { aiConfigured: true },
+    );
+    const ai = r.factors.filter((f) => f.source === 'ai').map((f) => f.label);
+    expect(ai).toEqual(["Uzbek notes report orthopnea ('cannot sleep at night').", 'SpO2 fell from 94% to 89% since the last visit.']);
+    expect(r.recommendedAction).toBe('Urgent physician review within 2-4 hours; consider re-hospitalisation.');
+    expect(r.warnings.some((w) => /does not diagnose/.test(w))).toBe(true);
+  });
+
+  it('withholds an action that is diagnostic throughout', () => {
+    const r = applyRiskSafetyLayer(high, gemini({ riskLevel: 'HIGH', recommendedAction: 'Diagnosis: sepsis. Admit.' }), { aiConfigured: true });
+    expect(r.recommendedAction).toBe(high.recommendedAction);
+  });
+
   it('marks FALLBACK_RULE_ENGINE when AI is configured but failed', () => {
     const r = applyRiskSafetyLayer(high, null, { aiConfigured: true, failure: 'quota' });
     expect(r).toMatchObject({ riskLevel: 'HIGH', engine: AiEngine.FALLBACK_RULE_ENGINE, confidence: null });
