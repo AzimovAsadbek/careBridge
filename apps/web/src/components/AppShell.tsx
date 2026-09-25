@@ -9,7 +9,7 @@ import type { Role, UserProfile } from '@/lib/types';
 import { SyncIndicator } from './SyncIndicator';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { useI18n } from '@/lib/i18n';
-import { cx, Skeleton } from './ui';
+import { Avatar, cx, Icon, Skeleton } from './ui';
 
 type NavKey = 'overview' | 'referrals' | 'visits' | 'patients' | 'voice';
 const NAV: { href: string; key: NavKey; roles: Role[]; icon: string }[] = [
@@ -28,15 +28,6 @@ function NavIcon({ d }: { d: string }) {
     </svg>
   );
 }
-
-const initials = (name: string) =>
-  name
-    .replace(/^Dr\.?\s+/i, '')
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((p) => p[0])
-    .join('')
-    .toUpperCase();
 
 export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -89,58 +80,73 @@ export function AppShell({ children }: { children: ReactNode }) {
         {t.nav.skip}
       </a>
 
-      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-line bg-white md:flex">
-        <Link href="/" className="flex items-center gap-2.5 px-5 py-5">
-          <img src="/icon.svg" alt="" className="h-8 w-8" />
-          <span className="text-[17px] font-semibold tracking-tight text-slate-900">
-            CareBridge<span className="text-brand-600"> AI</span>
+      <aside className="sticky top-0 hidden h-dvh w-[72px] shrink-0 flex-col border-r border-line bg-white md:flex lg:w-60">
+        <Link href="/" className="flex h-16 items-center gap-2.5 px-[22px] lg:px-5">
+          <img src="/icon.svg" alt="" className="h-7 w-7" />
+          <span className="hidden text-[16px] font-semibold tracking-tight text-slate-900 lg:inline">
+            CareBridge<span className="font-normal text-slate-400"> AI</span>
           </span>
         </Link>
-        <nav aria-label={t.nav.main} className="flex-1 space-y-0.5 px-3">
-          {nav.map((n) => (
-            <Link
-              key={n.href}
-              href={n.href}
-              aria-current={isActive(n.href) ? 'page' : undefined}
-              className={cx(
-                'flex h-10 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm font-medium',
-                isActive(n.href) ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
-              )}
-            >
-              <NavIcon d={n.icon} /> {label(n.key)}
-            </Link>
-          ))}
+        <nav aria-label={t.nav.main} className="flex-1 space-y-0.5 px-3 pt-2">
+          {nav.map((n) => {
+            const active = isActive(n.href);
+            return (
+              <Link
+                key={n.href}
+                href={n.href}
+                aria-current={active ? 'page' : undefined}
+                title={label(n.key)}
+                className={cx(
+                  'relative flex h-10 items-center justify-center gap-3 rounded-[var(--radius-control)] px-3 text-sm transition-colors lg:h-9 lg:justify-start',
+                  active ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
+                )}
+              >
+                {active && <span aria-hidden className="absolute -left-3 top-2 h-5 w-[3px] rounded-r-full bg-brand-600" />}
+                <span className={active ? 'text-brand-600' : 'text-slate-400'}>
+                  <NavIcon d={n.icon} />
+                </span>
+                <span className="sr-only lg:not-sr-only">{label(n.key)}</span>
+              </Link>
+            );
+          })}
         </nav>
-        <div className="border-t border-line p-4">
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700" aria-hidden>
-              {initials(user.fullName)}
-            </span>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-slate-900">{user.fullName}</p>
-              <p className="truncate text-xs text-slate-500">
-                {t.roles[user.role]} · {user.facility.name}
-              </p>
-            </div>
+        <div className="space-y-3 border-t border-line p-3">
+          <div className="hidden lg:block">
+            <LanguageSwitcher className="w-full justify-between [&>button]:flex-1" />
           </div>
-          <button onClick={signOut} className="mt-3 h-8 w-full rounded-[var(--radius-control)] border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-            {t.nav.signOut}
-          </button>
+          <div className="flex flex-col items-center gap-2 px-1 lg:flex-row lg:gap-3">
+            <Avatar name={user.fullName} size="sm" />
+            <div className="hidden min-w-0 flex-1 lg:block">
+              <p className="truncate text-sm font-medium text-slate-900">{user.fullName}</p>
+              <p className="truncate text-xs text-slate-500">{t.roles[user.role]}</p>
+            </div>
+            <button
+              onClick={signOut}
+              title={t.nav.signOut}
+              aria-label={t.nav.signOut}
+              className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-control)] text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+            >
+              <Icon name="logout" />
+            </button>
+          </div>
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-3 border-b border-line bg-white/95 px-4 backdrop-blur sm:px-6">
+        <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-3 border-b border-line bg-white/90 px-4 backdrop-blur sm:px-6 md:h-16">
           <Link href="/" className="flex items-center gap-2 md:hidden">
             <img src="/icon.svg" alt="" className="h-7 w-7" />
             <span className="text-[15px] font-semibold tracking-tight">CareBridge</span>
           </Link>
-          <p className="hidden min-w-0 truncate text-sm text-slate-500 md:block">
-            {t.nav.workspace(t.roles[user.role])} · <span className="text-slate-700">{user.facility.name}</span>
+          <p className="hidden min-w-0 items-center gap-1.5 truncate text-meta text-slate-500 md:flex">
+            <Icon name="mapPin" className="h-3.5 w-3.5 text-slate-400" />
+            <span className="truncate text-slate-700">{user.facility.name}</span>
+            <span aria-hidden>·</span>
+            <span className="truncate">{t.nav.workspace(t.roles[user.role])}</span>
           </p>
           <div className="flex shrink-0 items-center gap-2">
             <SyncIndicator compact />
-            <div className="hidden md:block">
+            <div className="hidden md:block lg:hidden">
               <LanguageSwitcher />
             </div>
             <div className="relative md:hidden">
@@ -149,19 +155,29 @@ export function AppShell({ children }: { children: ReactNode }) {
                 aria-expanded={menuOpen}
                 aria-haspopup="menu"
                 aria-label={t.nav.accountMenu}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700"
+                className="flex h-10 w-10 items-center justify-center rounded-full"
               >
-                {initials(user.fullName)}
+                <Avatar name={user.fullName} size="sm" />
               </button>
               {menuOpen && (
-                <div role="menu" className="absolute right-0 top-11 w-64 rounded-[var(--radius-card)] border border-line bg-white p-3 shadow-lg">
-                  <p className="text-sm font-semibold text-slate-900">{user.fullName}</p>
-                  <p className="text-xs text-slate-500">
-                    {t.roles[user.role]} · {user.facility.name}
-                  </p>
-                  <LanguageSwitcher className="mt-3" />
-                  <button role="menuitem" onClick={signOut} className="mt-3 h-9 w-full rounded-[var(--radius-control)] border border-slate-300 text-sm font-semibold text-slate-700">
-                    {t.nav.signOut}
+                <div role="menu" className="absolute right-0 top-12 w-72 animate-enter rounded-[var(--radius-card)] border border-line bg-white p-4 shadow-[var(--shadow-pop)]">
+                  <div className="flex items-center gap-3">
+                    <Avatar name={user.fullName} />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-slate-900">{user.fullName}</p>
+                      <p className="truncate text-xs text-slate-500">
+                        {t.roles[user.role]} · {user.facility.name}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="mb-1.5 mt-4 text-xs text-slate-500">{t.common.language}</p>
+                  <LanguageSwitcher className="w-full [&>button]:h-9 [&>button]:flex-1" />
+                  <button
+                    role="menuitem"
+                    onClick={signOut}
+                    className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-control)] text-sm font-medium text-slate-700 ring-1 ring-inset ring-slate-300"
+                  >
+                    <Icon name="logout" /> {t.nav.signOut}
                   </button>
                 </div>
               )}
@@ -169,26 +185,31 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <main id="main" tabIndex={-1} className="mx-auto w-full min-w-0 max-w-6xl flex-1 px-4 pb-28 pt-6 outline-none sm:px-6 md:pb-12">
-          {children}
+        <main id="main" tabIndex={-1} className="mx-auto w-full min-w-0 max-w-6xl flex-1 px-4 pb-28 pt-5 outline-none sm:px-6 sm:pt-8 md:pb-12">
+          <div key={pathname} className="animate-enter">
+            {children}
+          </div>
         </main>
       </div>
 
-      <nav aria-label={t.nav.main} className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
-        {nav.map((n) => (
-          <Link
-            key={n.href}
-            href={n.href}
-            aria-current={isActive(n.href) ? 'page' : undefined}
-            className={cx(
-              'flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium',
-              isActive(n.href) ? 'text-brand-700' : 'text-slate-500',
-            )}
-          >
-            <NavIcon d={n.icon} />
-            {label(n.key, true)}
-          </Link>
-        ))}
+      <nav aria-label={t.nav.main} className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+        {nav.map((n) => {
+          const active = isActive(n.href);
+          return (
+            <Link
+              key={n.href}
+              href={n.href}
+              aria-current={active ? 'page' : undefined}
+              className={cx('relative flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[11px]', active ? 'font-medium text-slate-900' : 'text-slate-500')}
+            >
+              {active && <span aria-hidden className="absolute top-0 h-0.5 w-8 rounded-b-full bg-brand-600" />}
+              <span className={active ? 'text-brand-600' : 'text-slate-400'}>
+                <NavIcon d={n.icon} />
+              </span>
+              {label(n.key, true)}
+            </Link>
+          );
+        })}
       </nav>
     </div>
   );

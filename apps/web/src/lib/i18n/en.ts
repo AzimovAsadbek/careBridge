@@ -7,6 +7,7 @@ const s = (n: number, one: string, other: string) => (n === 1 ? one : other);
 export const en = {
   langName: 'English',
   common: {
+    requiredNote: 'Required fields',
     loading: 'Loading…',
     tryAgain: 'Try again',
     couldNotLoad: 'Could not load data',
@@ -31,6 +32,8 @@ export const en = {
     language: 'Language',
   },
   errors: {
+    offlineTitle: 'You are offline',
+    offlineHint: 'The server can’t be reached right now. Work saved on this device is kept and will sync automatically when the connection returns.',
     offline: 'You are offline or the server is unreachable.',
     generic: 'Something went wrong. Please try again.',
     invalidLogin: 'Invalid email or password.',
@@ -155,6 +158,15 @@ export const en = {
     demoEnv: 'Demo environment · all patient data is fictional',
   },
   dashboard: {
+    greeting: {
+      morning: (n: string) => (n ? `Good morning, ${n}` : 'Good morning'),
+      afternoon: (n: string) => (n ? `Good afternoon, ${n}` : 'Good afternoon'),
+      evening: (n: string) => (n ? `Good evening, ${n}` : 'Good evening'),
+    },
+    statusAttention: (n: number) => `${n} ${s(n, 'item needs', 'items need')} attention today`,
+    statusClear: 'Everything is on track today',
+    allOnTrackHint: 'New overdue or high-risk follow-ups will appear here automatically.',
+    sentiment: 'Sentiment',
     title: 'Care overview',
     subtitle: 'Hospital → family clinic → rural health post, in one view.',
     needsAction: 'Needs action',
@@ -194,6 +206,7 @@ export const en = {
     topTopics: 'Most mentioned topics',
   },
   patients: {
+    clearFilters: 'Clear filters',
     title: 'Patients',
     subtitle: (n: number) => `${n} ${s(n, 'patient', 'patients')} in your care area`,
     subtitleDefault: 'Patients in your care area',
@@ -214,6 +227,12 @@ export const en = {
     loading: 'Loading patients…',
   },
   newPatient: {
+    sections: {
+      person: 'Personal information',
+      contact: 'Contact and address',
+      contactDesc: 'Used by the nurse to find and reach the patient at home',
+      care: 'Care team',
+    },
     title: 'New patient',
     subtitle: 'Register a patient admitted to your facility.',
     fullName: 'Full name',
@@ -231,6 +250,21 @@ export const en = {
     create: 'Create patient',
   },
   patient: {
+    nextStep: 'Next step',
+    next: {
+      discharge: 'Discharge the patient to start home follow-up.',
+      waitingDischarge: 'In hospital — follow-up starts at discharge.',
+      accept: 'The family doctor needs to accept the referral.',
+      assignNurse: 'Assign a nurse for the home visit.',
+      homeVisit: 'Home visit by the nurse.',
+      done: 'Follow-up completed.',
+    },
+    nextCta: { accept: 'Review referral', assignNurse: 'Assign nurse' },
+    careTeam: 'Care team',
+    noNurse: 'No nurse assigned yet',
+    stepOf: (n: number, total: number) => `Step ${n} of ${total}`,
+    showAllSteps: 'Show all steps',
+    journeyComplete: 'Journey complete',
     loading: 'Loading patient…',
     discharge: 'Discharge patient',
     currentRisk: 'Current risk',
@@ -359,6 +393,9 @@ export const en = {
     continue: 'Continue',
   },
   visit: {
+    groups: { bp: 'Blood pressure', heart: 'Heart rate and oxygen', general: 'Temperature and general condition' },
+    f: { systolic: 'Systolic', diastolic: 'Diastolic', pulse: 'Pulse', temperature: 'Temperature', spo2: 'SpO₂' },
+    symptomsHint: 'Tap every symptom the patient reports',
     eyebrow: 'Home visit',
     back: 'Home visits',
     loading: 'Loading visit…',
@@ -404,6 +441,10 @@ export const en = {
     labels: { observation: 'Vital signs', started: 'Visit started', completed: 'Visit completed' } as Record<string, string>,
   },
   risk: {
+    why: 'Why',
+    evidence: (n: number) => `Evidence (${n})`,
+    source: 'Source',
+    updated: (d: string) => `updated ${d}`,
     bpm: 'bpm',
     title: 'Risk assessment',
     desc: 'Clinical decision support',
@@ -498,6 +539,7 @@ export const en = {
   },
   stepper: { done: 'completed', current: 'in progress', late: 'overdue', upcoming: 'not started' },
   feedback: {
+    emptyFilteredHint: 'Try another priority or sentiment.',
     title: 'Patient voice',
     subtitle: 'Anonymous feedback from ward QR codes, classified by AI with safety checks.',
     priority: 'Priority',
@@ -529,10 +571,11 @@ export const en = {
     },
   },
   qr: {
+    trust: ['Anonymous — no name, phone or IP address is stored', 'Read by the facility’s quality team', 'Takes about 30 seconds'],
     header: 'Patient feedback',
     anonymous: 'Anonymous',
     title: 'How was your care?',
-    intro: 'Takes 30 seconds. We never ask for your name or phone, and nothing links this form to you.',
+    intro: 'Your answer helps improve care at this facility.',
     invalid: 'This QR code is not valid.',
     later: 'Please try again later.',
     noInternet: 'No internet connection. Please try again later.',

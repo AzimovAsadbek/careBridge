@@ -4,6 +4,7 @@ import type { Dict } from './en';
 export const uz: Dict = {
   langName: 'Oʻzbekcha',
   common: {
+    requiredNote: 'Majburiy maydonlar',
     loading: 'Yuklanmoqda…',
     tryAgain: 'Qayta urinish',
     couldNotLoad: 'Maʼlumotlarni yuklab boʻlmadi',
@@ -28,6 +29,8 @@ export const uz: Dict = {
     language: 'Til',
   },
   errors: {
+    offlineTitle: 'Internet aloqasi yoʻq',
+    offlineHint: 'Server hozir javob bermayapti. Qurilmada saqlangan maʼlumotlar yoʻqolmaydi va aloqa tiklanganda avtomatik sinxronlanadi.',
     offline: 'Internet yoʻq yoki serverga ulanib boʻlmadi.',
     generic: 'Xatolik yuz berdi. Qayta urinib koʻring.',
     invalidLogin: 'Email yoki parol notoʻgʻri.',
@@ -152,6 +155,15 @@ export const uz: Dict = {
     demoEnv: 'Demo muhit · barcha bemor maʼlumotlari toʻqima',
   },
   dashboard: {
+    greeting: {
+      morning: (n: string) => (n ? `Xayrli tong, ${n}` : 'Xayrli tong'),
+      afternoon: (n: string) => (n ? `Xayrli kun, ${n}` : 'Xayrli kun'),
+      evening: (n: string) => (n ? `Xayrli kech, ${n}` : 'Xayrli kech'),
+    },
+    statusAttention: (n: number) => `Bugun ${n} ta holat eʼtibor talab qiladi`,
+    statusClear: 'Bugun hammasi reja boʻyicha',
+    allOnTrackHint: 'Muddati oʻtgan yoki yuqori xavfli kuzatuvlar shu yerda avtomatik paydo boʻladi.',
+    sentiment: 'Kayfiyat',
     title: 'Umumiy koʻrinish',
     subtitle: 'Shifoxona → oilaviy poliklinika → qishloq tibbiyot punkti, bitta oynada.',
     needsAction: 'Harakat talab qiladi',
@@ -191,6 +203,7 @@ export const uz: Dict = {
     topTopics: 'Eng koʻp tilga olingan mavzular',
   },
   patients: {
+    clearFilters: 'Filtrlarni tozalash',
     title: 'Bemorlar',
     subtitle: (n) => `Hududingizda ${n} nafar bemor`,
     subtitleDefault: 'Hududingizdagi bemorlar',
@@ -211,6 +224,12 @@ export const uz: Dict = {
     loading: 'Bemorlar yuklanmoqda…',
   },
   newPatient: {
+    sections: {
+      person: 'Shaxsiy maʼlumotlar',
+      contact: 'Aloqa va manzil',
+      contactDesc: 'Hamshira bemorni uyda topishi va bogʻlanishi uchun',
+      care: 'Davolash jamoasi',
+    },
     title: 'Yangi bemor',
     subtitle: 'Muassasangizga yotqizilgan bemorni roʻyxatga oling.',
     fullName: 'F.I.Sh.',
@@ -228,6 +247,21 @@ export const uz: Dict = {
     create: 'Bemorni yaratish',
   },
   patient: {
+    nextStep: 'Keyingi qadam',
+    next: {
+      discharge: 'Uyda kuzatuvni boshlash uchun bemorni javob bering.',
+      waitingDischarge: 'Shifoxonada — kuzatuv javob berilgandan keyin boshlanadi.',
+      accept: 'Oilaviy shifokor yoʻllanmani qabul qilishi kerak.',
+      assignNurse: 'Uyga tashrif uchun hamshira tayinlang.',
+      homeVisit: 'Hamshiraning uyga tashrifi.',
+      done: 'Kuzatuv yakunlandi.',
+    },
+    nextCta: { accept: 'Yoʻllanmani koʻrish', assignNurse: 'Hamshira tayinlash' },
+    careTeam: 'Davolash jamoasi',
+    noNurse: 'Hamshira hali tayinlanmagan',
+    stepOf: (n: number, total: number) => `${total} tadan ${n}-qadam`,
+    showAllSteps: 'Barcha qadamlar',
+    journeyComplete: 'Yoʻl yakunlandi',
     loading: 'Bemor yuklanmoqda…',
     discharge: 'Bemorni chiqarish',
     currentRisk: 'Joriy xavf',
@@ -356,6 +390,9 @@ export const uz: Dict = {
     continue: 'Davom etish',
   },
   visit: {
+    groups: { bp: 'Qon bosimi', heart: 'Yurak urishi va kislorod', general: 'Harorat va umumiy holat' },
+    f: { systolic: 'Sistolik', diastolic: 'Diastolik', pulse: 'Puls', temperature: 'Harorat', spo2: 'SpO₂' },
+    symptomsHint: 'Bemor aytgan barcha belgilarni belgilang',
     eyebrow: 'Uyga tashrif',
     back: 'Uyga tashriflar',
     loading: 'Tashrif yuklanmoqda…',
@@ -401,6 +438,10 @@ export const uz: Dict = {
     labels: { observation: 'Hayotiy koʻrsatkichlar', started: 'Tashrif boshlandi', completed: 'Tashrif yakunlandi' },
   },
   risk: {
+    why: 'Sabab',
+    evidence: (n: number) => `Dalillar (${n})`,
+    source: 'Manba',
+    updated: (d: string) => `yangilandi ${d}`,
     bpm: 'zarba/daq',
     title: 'Xavfni baholash',
     desc: 'Klinik qaror qabul qilishda yordam',
@@ -494,6 +535,7 @@ export const uz: Dict = {
   },
   stepper: { done: 'bajarildi', current: 'jarayonda', late: 'muddati oʻtgan', upcoming: 'boshlanmagan' },
   feedback: {
+    emptyFilteredHint: 'Boshqa muhimlik yoki kayfiyatni tanlang.',
     title: 'Bemor fikri',
     subtitle: 'Palatalardagi QR kodlar orqali kelgan anonim fikrlar, SI tomonidan xavfsizlik tekshiruvi bilan tasniflangan.',
     priority: 'Muhimlik',
@@ -525,10 +567,11 @@ export const uz: Dict = {
     },
   },
   qr: {
+    trust: ['Anonim — ism, telefon yoki IP manzil saqlanmaydi', 'Muassasaning sifat boʻlimi oʻqiydi', 'Taxminan 30 soniya oladi'],
     header: 'Bemor fikri',
     anonymous: 'Anonim',
     title: 'Sizga koʻrsatilgan yordam qanday boʻldi?',
-    intro: '30 soniya vaqt oladi. Biz hech qachon ismingiz yoki telefoningizni soʻramaymiz, bu shakl siz bilan bogʻlanmaydi.',
+    intro: 'Javobingiz ushbu muassasadagi xizmatni yaxshilashga yordam beradi.',
     invalid: 'Bu QR kod yaroqsiz.',
     later: 'Keyinroq qayta urinib koʻring.',
     noInternet: 'Internet aloqasi yoʻq. Keyinroq qayta urinib koʻring.',

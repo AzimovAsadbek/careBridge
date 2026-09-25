@@ -2,8 +2,13 @@
 
 /*
  * CareBridge design tokens — calm clinical palette.
- * Brand teal for navigation/primary actions only; semantic colours carry meaning
- * (risk, status) and are always paired with an icon or text, never colour alone.
+ * Neutral ink + white surfaces carry the UI. Brand teal is reserved for primary actions,
+ * links and the current location. Semantic colours only carry meaning:
+ *   danger  (red)   → high risk, overdue, rejected
+ *   warning (amber) → medium risk, offline, waiting to sync
+ *   success (green) → low risk, completed, synced
+ *   info    (sky)   → scheduled, in progress, syncing
+ * Every semantic colour is paired with an icon, shape or text — never colour alone.
  */
 @theme {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -16,22 +21,47 @@
   --color-brand-700: #0c5e53;
   --color-brand-900: #0a3a34;
 
-  --color-canvas: #f5f7f9;
-  --color-line: #e3e8ee;
+  --color-canvas: #f6f7f9;
+  --color-line: #e4e7ec;
+  --color-line-soft: #eef0f3;
 
   --radius-control: 0.5rem;
   --radius-card: 0.75rem;
 
   --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04);
+  --shadow-pop: 0 8px 24px -6px rgb(16 24 40 / 0.14), 0 2px 6px -2px rgb(16 24 40 / 0.06);
+
+  /* Type scale: page 26/32 · section 15/22 · body 14/20 · meta 13/18 · caption 12/16 */
+  --text-page: 1.625rem;
+  --text-page--line-height: 2rem;
+  --text-section: 0.9375rem;
+  --text-section--line-height: 1.375rem;
+  --text-meta: 0.8125rem;
+  --text-meta--line-height: 1.125rem;
+
+  --animate-enter: cb-enter 180ms ease-out both;
+}
+
+@keyframes cb-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 html {
   -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
   background: var(--color-canvas);
-  color: #0f172a;
+  color: #101828;
+  font-feature-settings: "cv11", "ss01";
 }
 
 :focus-visible {

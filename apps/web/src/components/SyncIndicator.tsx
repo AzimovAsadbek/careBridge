@@ -13,7 +13,10 @@ interface View {
   icon: IconName;
   short: string;
   label: string;
+  /** Full-strength tone for banners. */
   tone: string;
+  /** Header pill: problems stand out, the healthy state stays quiet. */
+  pill: string;
 }
 
 /** Single source of truth for how connectivity + outbox state is described. */
@@ -27,13 +30,14 @@ export function describeSync(s: SyncState): View {
       short: queued ? t.offlineShort(queued) : t.offline,
       label: queued ? t.offlineLabel(queued) : t.offlineWorking,
       tone: 'bg-amber-50 text-amber-950 ring-amber-300',
+      pill: 'bg-amber-50 text-amber-900 ring-amber-300',
     };
   }
   if (s.syncing) {
-    return { kind: 'syncing', icon: 'refresh', short: t.syncingShort, label: t.syncingLabel(queued), tone: 'bg-sky-50 text-sky-900 ring-sky-200' };
+    return { kind: 'syncing', icon: 'refresh', short: t.syncingShort, label: t.syncingLabel(queued), tone: 'bg-sky-50 text-sky-900 ring-sky-200', pill: 'bg-sky-50 text-sky-800 ring-sky-200' };
   }
   if (queued) {
-    return { kind: 'queued', icon: 'clock', short: t.queuedShort(queued), label: t.queuedLabel(queued), tone: 'bg-amber-50 text-amber-950 ring-amber-300' };
+    return { kind: 'queued', icon: 'clock', short: t.queuedShort(queued), label: t.queuedLabel(queued), tone: 'bg-amber-50 text-amber-950 ring-amber-300', pill: 'bg-amber-50 text-amber-900 ring-amber-300' };
   }
   return {
     kind: 'synced',
@@ -41,6 +45,7 @@ export function describeSync(s: SyncState): View {
     short: t.syncedShort,
     label: s.lastSyncAt ? t.syncedAgo(ago(s.lastSyncAt)) : t.onlineSynced,
     tone: 'bg-emerald-50 text-emerald-900 ring-emerald-200',
+    pill: 'text-slate-600 ring-transparent [&>svg]:text-emerald-600',
   };
 }
 
@@ -58,7 +63,10 @@ export function SyncIndicator({ compact = false }: { compact?: boolean }) {
 
   return (
     <div className="flex items-center gap-2" aria-live="polite">
-      <span className={cx('inline-flex h-8 items-center gap-1.5 rounded-full text-xs font-semibold ring-1 ring-inset', compact && v.kind === 'synced' ? 'px-2 lg:px-3' : 'px-3', v.tone)} title={v.label}>
+      <span
+        className={cx('inline-flex h-8 items-center gap-1.5 rounded-full text-xs font-medium ring-1 ring-inset', compact && v.kind === 'synced' ? 'px-2 lg:px-2.5' : 'px-3', compact ? v.pill : v.tone)}
+        title={v.label}
+      >
         <Icon name={v.icon} className={cx('h-4 w-4', v.kind === 'syncing' && 'animate-spin')} />
         {compact ? (
           <>
@@ -71,12 +79,12 @@ export function SyncIndicator({ compact = false }: { compact?: boolean }) {
         )}
       </span>
       {s.online && s.failed > 0 && !s.syncing && (
-        <button onClick={() => void getSyncEngine().retryNow()} className="h-8 rounded-full px-2 text-xs font-semibold text-brand-700 underline underline-offset-2">
+        <button onClick={() => void getSyncEngine().retryNow()} className="h-8 rounded-full px-2 text-xs font-medium text-brand-700 underline underline-offset-2">
           {t.sync.syncNow}
         </button>
       )}
       {s.rejected > 0 && (
-        <span className="inline-flex h-8 items-center gap-1 rounded-full bg-red-50 px-3 text-xs font-semibold text-red-800 ring-1 ring-inset ring-red-200">
+        <span className="inline-flex h-8 items-center gap-1 rounded-full bg-red-50 px-3 text-xs font-medium text-red-800 ring-1 ring-inset ring-red-200">
           <Icon name="alert" className="h-3.5 w-3.5" /> {t.sync.rejected(s.rejected)}
         </span>
       )}

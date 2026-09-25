@@ -10,7 +10,7 @@ const NAME: Record<Locale, string> = { uz: 'Oʻzbekcha', ru: 'Русский', e
 export function LanguageSwitcher({ className }: { className?: string }) {
   const { locale, setLocale, t } = useI18n();
   return (
-    <div role="group" aria-label={t.common.language} className={cx('inline-flex rounded-full border border-slate-300 bg-white p-0.5', className)}>
+    <div role="group" aria-label={t.common.language} className={cx('inline-flex rounded-full bg-slate-100 p-0.5', className)}>
       {LOCALES.map((l) => (
         <button
           key={l}
@@ -21,8 +21,8 @@ export function LanguageSwitcher({ className }: { className?: string }) {
           title={NAME[l]}
           onClick={() => setLocale(l)}
           className={cx(
-            'h-7 min-w-9 rounded-full px-2 text-xs font-semibold transition-colors',
-            locale === l ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-100',
+            'h-7 min-w-9 rounded-full px-2 text-xs font-medium transition-[background-color,color,box-shadow]',
+            locale === l ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-900',
           )}
         >
           {SHORT[l]}

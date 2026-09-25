@@ -36,7 +36,7 @@ export function DischargePanel({ patient, onDone, onCancel }: { patient: Patient
   }
 
   return (
-    <Card className="border-brand-200 ring-1 ring-brand-100">
+    <Card className="animate-enter">
       <CardTitle description={d.desc}>{d.title}</CardTitle>
       <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
         {error && <div className="sm:col-span-2"><Alert>{error}</Alert></div>}
