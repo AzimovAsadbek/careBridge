@@ -13,7 +13,8 @@ import type { GeneralCondition, NurseVisit, Observation, PatientDetail } from '@
 import type { OutboxOp } from '@/lib/db';
 import { PriorityBadge, RiskBadge } from '@/components/badges';
 import { RiskCard, VitalsTable } from '@/components/clinical';
-import { Alert, Badge, Button, Card, CardTitle, EmptyState, ErrorState, Field, Input, Loading, Select, Textarea, cx } from '@/components/ui';
+import { Alert, Badge, Button, Card, CardTitle, EmptyState, ErrorState, Field, Icon, Input, Loading, PageHeader, Select, Textarea, cx } from '@/components/ui';
+import { SyncBanner } from '@/components/SyncIndicator';
 
 const SYMPTOMS = ['Shortness of breath', 'Chest pain', 'Swelling', 'Dizziness', 'Fever', 'Cough', 'Confusion', 'Bleeding', 'Nausea', 'Fatigue'];
 
@@ -135,50 +136,78 @@ function Visit({ id }: { id: string }) {
 
   const setV = (k: keyof typeof emptyVitals) => (e: { target: { value: string } }) => setVitals((v) => ({ ...v, [k]: e.target.value }));
 
+  const hasObs = serverObs.length + localObs.length > 0;
+
   return (
     <div className="space-y-4">
-      <div>
-        <Link href="/nurse" className="text-sm font-semibold text-brand-700">← My visits</Link>
-        <h1 className="mt-2 text-xl font-bold tracking-tight">{visit.patient.fullName}</h1>
-        <p className="text-sm text-slate-500">
-          {age(visit.patient.birthDate)} y · {visit.patient.sex === 'MALE' ? 'Male' : 'Female'} · {visit.patient.address}, {visit.patient.district}
-        </p>
-        {visit.patient.phone && (
-          <a href={`tel:${visit.patient.phone}`} className="mt-1 inline-block text-sm font-semibold text-brand-700">
-            Call {visit.patient.phone}
-          </a>
-        )}
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <PriorityBadge priority={visit.referral.priority} />
-          <RiskBadge level={patient.data?.riskLevel ?? visit.patient.riskLevel} />
-          <Badge tone={status === 'COMPLETED' ? 'green' : status === 'IN_PROGRESS' ? 'brand' : 'blue'}>
-            {status === 'COMPLETED' ? 'Completed' : status === 'IN_PROGRESS' ? 'Visit in progress' : 'Scheduled'}
-          </Badge>
-          <span className={cx('text-xs', due.overdue ? 'font-semibold text-red-600' : 'text-slate-500')}>{due.text}</span>
-        </div>
-      </div>
+      <PageHeader
+        back={{ href: '/nurse', label: 'Home visits' }}
+        eyebrow="Home visit"
+        title={visit.patient.fullName}
+        subtitle={
+          <span className="flex flex-wrap items-center gap-2">
+            <span>
+              {age(visit.patient.birthDate)} y · {visit.patient.sex === 'MALE' ? 'Male' : 'Female'}
+            </span>
+            <Badge tone={status === 'COMPLETED' ? 'green' : status === 'IN_PROGRESS' ? 'brand' : 'blue'}>
+              {status === 'COMPLETED' ? 'Completed' : status === 'IN_PROGRESS' ? 'Visit in progress' : 'Scheduled'}
+            </Badge>
+            <RiskBadge level={patient.data?.riskLevel ?? visit.patient.riskLevel} />
+          </span>
+        }
+      />
 
-      {(visits.stale || patient.stale) && (
-        <Alert tone="amber" title="Offline — using the copy saved on this device">
-          Visit details from {fmtDateTime(visits.cachedAt ?? patient.cachedAt)}. Anything you record is stored here and synced automatically.
-        </Alert>
-      )}
+      {/* Not sticky: the header status pill stays visible while the form is filled in. */}
+      <SyncBanner savedAt={visits.stale || patient.stale ? fmtDateTime(visits.cachedAt ?? patient.cachedAt) : null} />
 
       <Card>
-        <CardTitle>Reason for follow-up</CardTitle>
-        <p className="text-sm text-slate-800">{visit.referral.reason}</p>
+        <CardTitle
+          description={<span className={cx(due.overdue && 'font-semibold text-red-700')}>{due.text}</span>}
+          action={<PriorityBadge priority={visit.referral.priority} />}
+        >
+          Visit brief
+        </CardTitle>
+        <p className="text-sm font-medium text-slate-900">{visit.referral.reason}</p>
         {visit.patient.diagnosisNote && visit.patient.diagnosisNote !== visit.referral.reason && (
-          <p className="mt-1 text-sm text-slate-500">{visit.patient.diagnosisNote}</p>
+          <p className="mt-1 text-sm text-slate-600">{visit.patient.diagnosisNote}</p>
         )}
+        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-line pt-4 text-sm text-slate-700">
+          <span className="min-w-0 flex-1">
+            {visit.patient.address}, {visit.patient.district}
+          </span>
+          {visit.patient.phone && (
+            <a
+              href={`tel:${visit.patient.phone}`}
+              className="inline-flex h-10 items-center gap-2 rounded-[var(--radius-control)] border border-slate-300 px-4 font-semibold text-slate-800 hover:bg-slate-50"
+            >
+              <Icon name="phone" /> Call patient
+            </a>
+          )}
+        </div>
       </Card>
 
-      {saved && <Alert tone="green" action={<button className="text-xs font-semibold underline" onClick={() => setSaved(null)}>Dismiss</button>}>{saved}</Alert>}
+      {saved && (
+        <Alert
+          tone="green"
+          action={
+            <button className="text-xs font-semibold underline" onClick={() => setSaved(null)}>
+              Dismiss
+            </button>
+          }
+        >
+          {saved}
+        </Alert>
+      )}
       {rejected.map((op) => (
         <Alert
           key={op.localOperationId}
           tone="red"
           title={`${op.meta?.label ?? 'Change'} was rejected by the server`}
-          action={<Button variant="secondary" onClick={() => void getSyncEngine().discard(op.localOperationId)}>Discard</Button>}
+          action={
+            <Button variant="secondary" size="sm" onClick={() => void getSyncEngine().discard(op.localOperationId)}>
+              Discard
+            </Button>
+          }
         >
           {op.lastError}
         </Alert>
@@ -186,23 +215,29 @@ function Visit({ id }: { id: string }) {
 
       {status !== 'COMPLETED' && (
         <Card>
-          <CardTitle>Record vital signs</CardTitle>
-          <form onSubmit={saveVitals} className="space-y-4" noValidate={false}>
+          <CardTitle description="Saved on this device first — works without internet">
+            <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-600 text-xs text-white">1</span>
+            Record observation
+          </CardTitle>
+          <form onSubmit={saveVitals} className="space-y-5">
             {formError && <Alert>{formError}</Alert>}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <Field label="Systolic BP" htmlFor="sys"><Input id="sys" type="number" inputMode="numeric" min={50} max={260} placeholder="mmHg" value={vitals.systolic} onChange={setV('systolic')} /></Field>
-              <Field label="Diastolic BP" htmlFor="dia"><Input id="dia" type="number" inputMode="numeric" min={30} max={160} placeholder="mmHg" value={vitals.diastolic} onChange={setV('diastolic')} /></Field>
-              <Field label="Pulse" htmlFor="pulse"><Input id="pulse" type="number" inputMode="numeric" min={20} max={250} placeholder="bpm" value={vitals.pulse} onChange={setV('pulse')} /></Field>
-              <Field label="Temperature" htmlFor="temp"><Input id="temp" type="number" inputMode="decimal" step="0.1" min={30} max={44} placeholder="°C" value={vitals.temperature} onChange={setV('temperature')} /></Field>
-              <Field label="SpO₂" htmlFor="spo2"><Input id="spo2" type="number" inputMode="numeric" min={50} max={100} placeholder="%" value={vitals.spo2} onChange={setV('spo2')} /></Field>
-              <Field label="General condition" htmlFor="cond">
-                <Select id="cond" value={vitals.generalCondition} onChange={setV('generalCondition')}>
-                  <option value="">—</option><option value="GOOD">Good</option><option value="FAIR">Fair</option><option value="POOR">Poor</option><option value="CRITICAL">Critical</option>
-                </Select>
-              </Field>
-            </div>
             <fieldset>
-              <legend className="mb-2 text-sm font-medium text-slate-700">Symptoms</legend>
+              <legend className="mb-2 text-sm font-semibold text-slate-900">Vital signs</legend>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <Field label="Systolic BP (mmHg)" htmlFor="sys"><Input id="sys" type="number" inputMode="numeric" min={50} max={260} value={vitals.systolic} onChange={setV('systolic')} /></Field>
+                <Field label="Diastolic BP (mmHg)" htmlFor="dia"><Input id="dia" type="number" inputMode="numeric" min={30} max={160} value={vitals.diastolic} onChange={setV('diastolic')} /></Field>
+                <Field label="Pulse (bpm)" htmlFor="pulse"><Input id="pulse" type="number" inputMode="numeric" min={20} max={250} value={vitals.pulse} onChange={setV('pulse')} /></Field>
+                <Field label="Temperature (°C)" htmlFor="temp"><Input id="temp" type="number" inputMode="decimal" step="0.1" min={30} max={44} value={vitals.temperature} onChange={setV('temperature')} /></Field>
+                <Field label="SpO₂ (%)" htmlFor="spo2"><Input id="spo2" type="number" inputMode="numeric" min={50} max={100} value={vitals.spo2} onChange={setV('spo2')} /></Field>
+                <Field label="General condition" htmlFor="cond">
+                  <Select id="cond" value={vitals.generalCondition} onChange={setV('generalCondition')}>
+                    <option value="">Not assessed</option><option value="GOOD">Good</option><option value="FAIR">Fair</option><option value="POOR">Poor</option><option value="CRITICAL">Critical</option>
+                  </Select>
+                </Field>
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend className="mb-2 text-sm font-semibold text-slate-900">Symptoms</legend>
               <div className="flex flex-wrap gap-2">
                 {SYMPTOMS.map((s) => {
                   const on = symptoms.includes(s);
@@ -212,41 +247,59 @@ function Visit({ id }: { id: string }) {
                       key={s}
                       aria-pressed={on}
                       onClick={() => setSymptoms((cur) => (on ? cur.filter((x) => x !== s) : [...cur, s]))}
-                      className={cx('min-h-9 rounded-full border px-3 text-sm', on ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white text-slate-700')}
+                      className={cx(
+                        'inline-flex h-10 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium',
+                        on ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50',
+                      )}
                     >
+                      {on && <Icon name="check" className="h-3.5 w-3.5" />}
                       {s}
                     </button>
                   );
                 })}
               </div>
-              <Input className="mt-2" placeholder="Other symptoms, comma separated (any language)" maxLength={300} value={vitals.other} onChange={setV('other')} />
+              <label htmlFor="other" className="sr-only">Other symptoms</label>
+              <Input id="other" className="mt-3" placeholder="Other symptoms, comma separated (any language)" maxLength={300} value={vitals.other} onChange={setV('other')} />
             </fieldset>
-            <Field label="Notes" htmlFor="notes"><Textarea id="notes" rows={2} maxLength={1000} value={vitals.notes} onChange={setV('notes')} /></Field>
-            <Button type="submit" loading={saving} className="w-full sm:w-auto">Save observation</Button>
+            <Field label="Notes" htmlFor="notes" optional hint="Any language — e.g. what the patient or family reports">
+              <Textarea id="notes" rows={3} maxLength={1000} value={vitals.notes} onChange={setV('notes')} />
+            </Field>
+            <Button type="submit" size="lg" loading={saving} className="w-full sm:w-auto">
+              <Icon name={sync.online ? 'check' : 'device'} className="h-5 w-5" />
+              {sync.online ? 'Save observation' : 'Save on this device'}
+            </Button>
           </form>
         </Card>
       )}
 
       <Card>
-        <CardTitle>Observations this visit</CardTitle>
+        <CardTitle description={localObs.length ? `${localObs.length} waiting to sync` : undefined}>Observations this visit</CardTitle>
         <VitalsTable
           observations={[...localObs.map(toObservation), ...serverObs.filter((o) => !localObs.some((l) => l.entityId === o.clientId))]}
           pendingIds={new Set(localObs.map((o) => o.entityId))}
         />
       </Card>
 
-      {patient.data && <RiskCard assessment={patient.data.riskAssessments[0]} />}
-      {!sync.online && localObs.length > 0 && (
-        <p className="text-xs text-slate-500">AI risk assessment runs on the server after these observations sync.</p>
+      {!sync.online && localObs.length > 0 ? (
+        <Alert tone="blue" icon="sparkle" title="Risk assessment after sync">
+          The AI risk assessment runs on the server once these observations reach it.
+        </Alert>
+      ) : (
+        patient.data && <RiskCard assessment={patient.data.riskAssessments[0]} />
       )}
 
       {status !== 'COMPLETED' && (
         <Card>
-          <CardTitle>Complete visit</CardTitle>
-          <form onSubmit={complete} className="space-y-3">
-            <Field label="Outcome / plan" htmlFor="outcome"><Textarea id="outcome" rows={2} maxLength={2000} value={outcome} onChange={(e) => setOutcome(e.target.value)} placeholder="e.g. BP controlled, medication adherence discussed" /></Field>
+          <CardTitle description="Close the visit when you are done">
+            <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-600 text-xs text-white">2</span>
+            Complete visit
+          </CardTitle>
+          <form onSubmit={complete} className="space-y-4">
+            <Field label="Outcome and plan" htmlFor="outcome">
+              <Textarea id="outcome" rows={3} maxLength={2000} value={outcome} onChange={(e) => setOutcome(e.target.value)} placeholder="e.g. BP controlled, medication adherence discussed" />
+            </Field>
             {riskLevel === 'HIGH' && patientStatus === 'STABLE' && (
-              <Alert tone="amber">AI risk is high for this patient. Confirm with the family doctor before closing follow-up as stable.</Alert>
+              <Alert tone="amber">Risk is high for this patient. Confirm with the family doctor before closing follow-up as stable.</Alert>
             )}
             <Field label="Patient status after visit" htmlFor="pst">
               <Select id="pst" value={patientStatus} onChange={(e) => setPatientStatus(e.target.value as 'STABLE' | 'IN_FOLLOW_UP')}>
@@ -254,10 +307,10 @@ function Visit({ id }: { id: string }) {
                 <option value="IN_FOLLOW_UP">Needs continued follow-up</option>
               </Select>
             </Field>
-            <Button type="submit" variant="secondary" loading={saving} disabled={serverObs.length + localObs.length === 0}>
+            <Button type="submit" variant="secondary" size="lg" className="w-full sm:w-auto" loading={saving} disabled={!hasObs}>
               Complete visit
             </Button>
-            {serverObs.length + localObs.length === 0 && <p className="text-xs text-slate-500">Record at least one observation first.</p>}
+            {!hasObs && <p className="text-xs text-slate-600">Record at least one observation first.</p>}
           </form>
         </Card>
       )}
@@ -273,7 +326,7 @@ function VisitPage() {
 
 export default function Page() {
   return (
-    <Suspense fallback={<Loading />}>
+    <Suspense fallback={<Loading label="Loading visit…" />}>
       <VisitPage />
     </Suspense>
   );
