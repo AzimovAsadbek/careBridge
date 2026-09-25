@@ -1,14 +1,28 @@
 @import "tailwindcss";
 
+/*
+ * CareBridge design tokens — calm clinical palette.
+ * Brand teal for navigation/primary actions only; semantic colours carry meaning
+ * (risk, status) and are always paired with an icon or text, never colour alone.
+ */
 @theme {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --color-brand-50: #effaf8;
-  --color-brand-100: #d7f2ed;
-  --color-brand-200: #b0e4da;
+
+  --color-brand-50: #eff8f6;
+  --color-brand-100: #d6efea;
+  --color-brand-200: #acdfd5;
   --color-brand-500: #14907d;
   --color-brand-600: #0e7667;
-  --color-brand-700: #0d5f54;
-  --color-brand-900: #0b3b35;
+  --color-brand-700: #0c5e53;
+  --color-brand-900: #0a3a34;
+
+  --color-canvas: #f5f7f9;
+  --color-line: #e3e8ee;
+
+  --radius-control: 0.5rem;
+  --radius-card: 0.75rem;
+
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04);
 }
 
 html {
@@ -16,11 +30,20 @@ html {
 }
 
 body {
-  background: #f6f8fa;
+  background: var(--color-canvas);
   color: #0f172a;
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-brand-500);
+  outline: 2px solid var(--color-brand-600);
   outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

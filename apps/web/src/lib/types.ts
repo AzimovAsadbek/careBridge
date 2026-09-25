@@ -85,6 +85,7 @@ export interface FollowUp {
   completedAt: string | null;
   outcome: string | null;
   syncedFromOffline: boolean;
+  createdAt?: string;
   assignedNurse: { id: string; fullName: string } | null;
   observations?: Observation[];
 }
