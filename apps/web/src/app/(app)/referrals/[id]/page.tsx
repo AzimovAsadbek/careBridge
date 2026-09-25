@@ -1,17 +1,16 @@
 'use client';
 
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { api, errorMessage } from '@/lib/api';
 import { useResource } from '@/lib/resource';
-import { age, dueIn, fmtDateTime } from '@/lib/format';
+import { age, fmtDateTime } from '@/lib/format';
 import { session } from '@/lib/session';
 import type { ReferralDetail, StaffMember } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
-import { FollowUpStatusBadge, PriorityBadge, ReferralStatusBadge, RiskBadge } from '@/components/badges';
+import { DeadlineChip, FollowUpStatusBadge, PriorityBadge, ReferralStatusBadge, RiskBadge } from '@/components/badges';
 import { CareJourney, VitalsTable } from '@/components/clinical';
-import { Alert, Button, Card, CardTitle, DescriptionList, ErrorState, Field, Icon, Loading, PageHeader, Select, cx } from '@/components/ui';
+import { Alert, Button, ButtonLink, Card, CardTitle, DescriptionList, ErrorState, Field, Icon, Loading, Overline, PageHeader, Select, cx } from '@/components/ui';
 
 export default function ReferralPage() {
   const { id } = useParams<{ id: string }>();
@@ -25,11 +24,10 @@ export default function ReferralPage() {
   const tr = t.referral;
 
   if (error) return <ErrorState message={errorMessage(error)} onRetry={reload} />;
-  if (loading && !r) return <Loading label={tr.loading} />;
+  if (loading && !r) return <Loading label={tr.loading} variant="detail" />;
   if (!r) return null;
 
   const canManage = role === 'DOCTOR' || role === 'ADMIN';
-  const due = dueIn(r.deadline);
   const openFollowUp = r.followUps.find((f) => f.status !== 'COMPLETED');
   const latestFollowUp = r.followUps[0];
   const overdue = r.status === 'OVERDUE';
@@ -73,13 +71,13 @@ export default function ReferralPage() {
           </span>
         }
         actions={
-          <Link href={`/patients/${r.patient.id}`} className="inline-flex h-10 items-center gap-1 text-sm font-semibold text-brand-700 hover:underline">
-            {tr.patientRecord} <Icon name="chevronRight" className="h-3.5 w-3.5" />
-          </Link>
+          <ButtonLink href={`/patients/${r.patient.id}`} variant="secondary">
+            <Icon name="user" /> {tr.patientRecord}
+          </ButtonLink>
         }
       />
 
-      <div className="space-y-4">
+      <div className="space-y-6">
         {msg && <Alert tone={msg.tone}>{msg.text}</Alert>}
         {overdue && (
           <Alert tone="red" title={tr.overdueTitle}>
@@ -87,8 +85,8 @@ export default function ReferralPage() {
           </Alert>
         )}
 
-        <div className="grid gap-4 lg:grid-cols-3">
-          <Card className="lg:col-span-2">
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Card className="order-2 lg:order-1 lg:col-span-2">
             <CardTitle description={tr.workflowDesc}>{tr.workflow}</CardTitle>
             <CareJourney
               steps={[
@@ -101,14 +99,17 @@ export default function ReferralPage() {
             />
           </Card>
 
-          <Card className={cx(!nextAction.done && canManage && 'border-brand-200 ring-1 ring-brand-100')}>
-            <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">{tr.nextAction}</p>
-            <p className="mt-1 text-base font-semibold text-slate-900">{nextAction.title}</p>
+          <Card className={cx('order-1 border-t-[3px] lg:order-2', nextAction.done ? 'border-t-emerald-500' : overdue ? 'border-t-red-500' : 'border-t-brand-600')}>
+            <Overline>{tr.nextAction}</Overline>
+            <p className="mt-1.5 flex items-center gap-2 text-section font-semibold text-slate-900">
+              {nextAction.done && <Icon name="checkCircle" className="h-4 w-4 text-emerald-600" />}
+              {nextAction.title}
+            </p>
             <p className="mt-0.5 text-sm text-slate-600">{nextAction.body}</p>
             {canManage && r.status !== 'COMPLETED' && (
               <div className="mt-4 space-y-3">
                 {!r.acceptedAt && (
-                  <Button className="w-full" loading={busy === 'accept'} onClick={() => run('accept')}>
+                  <Button className="w-full" size="lg" loading={busy === 'accept'} onClick={() => run('accept')}>
                     {tr.accept}
                   </Button>
                 )}
@@ -140,21 +141,22 @@ export default function ReferralPage() {
           </Card>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-3">
-          <div className="min-w-0 space-y-4 lg:col-span-2">
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="min-w-0 space-y-6 lg:col-span-2">
             <Card>
               <CardTitle>{tr.dischargeInfo}</CardTitle>
               <p className="text-sm font-medium text-slate-900">{r.reason}</p>
               {r.dischargeSummary && <p className="mt-2 whitespace-pre-line text-sm text-slate-700">{r.dischargeSummary}</p>}
-              <div className="mt-4 border-t border-line pt-4">
+              <div className="mt-4 border-t border-line-soft pt-4">
                 <DescriptionList
                   items={[
                     { label: tr.created, value: fmtDateTime(r.createdAt) },
                     {
                       label: tr.deadline,
                       value: (
-                        <span className={cx(due.overdue && r.status !== 'COMPLETED' && 'text-red-700')}>
-                          {fmtDateTime(r.deadline)} {r.status !== 'COMPLETED' && `(${due.text})`}
+                        <span className="flex flex-wrap items-center gap-x-2">
+                          {fmtDateTime(r.deadline)}
+                          {r.status !== 'COMPLETED' && <DeadlineChip deadline={r.deadline} />}
                         </span>
                       ),
                     },
@@ -176,7 +178,7 @@ export default function ReferralPage() {
                   {f.syncedFromOffline && ` · ${tr.offlineSynced}`}
                 </p>
                 {f.outcome && (
-                  <p className="mb-3 rounded-[var(--radius-control)] bg-slate-50 px-3 py-2 text-sm text-slate-800">
+                  <p className="mb-4 border-l-[3px] border-slate-300 py-0.5 pl-3 text-sm text-slate-800">
                     <span className="font-medium">{tr.outcome}:</span> {f.outcome}
                   </p>
                 )}
@@ -186,10 +188,7 @@ export default function ReferralPage() {
           </div>
 
           <Card className="h-fit">
-            <CardTitle>{tr.patient}</CardTitle>
-            <div className="mb-3">
-              <RiskBadge level={r.patient.riskLevel} />
-            </div>
+            <CardTitle action={<RiskBadge level={r.patient.riskLevel} />}>{tr.patient}</CardTitle>
             <DescriptionList
               columns={1}
               items={[
