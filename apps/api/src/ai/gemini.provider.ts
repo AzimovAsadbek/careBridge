@@ -52,7 +52,7 @@ export class GeminiProvider extends AiProvider {
       .split(',')
       .map((m) => m.trim())
       .filter((m) => m && m !== this.model);
-    this.timeoutMs = Number(config.get('AI_TIMEOUT_MS') ?? 20_000);
+    this.timeoutMs = Number(config.get('AI_TIMEOUT_MS') ?? 45_000);
     this.client = apiKey
       ? new GoogleGenAI({
           apiKey,
