@@ -15,6 +15,10 @@ import { PriorityBadge, RiskBadge } from '@/components/badges';
 import { RiskCard, VitalsTable } from '@/components/clinical';
 import { Alert, Badge, Button, Card, CardTitle, EmptyState, ErrorState, Field, Icon, Input, Loading, PageHeader, Select, Textarea, cx } from '@/components/ui';
 import { SyncBanner } from '@/components/SyncIndicator';
+import { useI18n } from '@/lib/i18n';
+
+/** Outbox labels are stored in English; map them to dictionary keys for display. */
+const OP_LABEL: Record<string, 'observation' | 'started' | 'completed'> = { 'Vital signs': 'observation', 'Visit started': 'started', 'Visit completed': 'completed' };
 
 const SYMPTOMS = ['Shortness of breath', 'Chest pain', 'Swelling', 'Dizziness', 'Fever', 'Cough', 'Confusion', 'Bleeding', 'Nausea', 'Fatigue'];
 
@@ -53,6 +57,8 @@ function Visit({ id }: { id: string }) {
   const [saved, setSaved] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const { t } = useI18n();
+  const tv = t.visit;
 
   usePollWhile(sync.online && !!patient.data?.riskAssessments[0]?.aiPending, patient.reload);
 
@@ -78,8 +84,10 @@ function Visit({ id }: { id: string }) {
   if (visits.loading && !visits.data) return <Loading />;
   if (!visit) {
     return (
-      <EmptyState title="Visit not available on this device">
-        Open <Link className="text-brand-700 underline" href="/nurse">My visits</Link> while online to download it.
+      <EmptyState title={tv.notAvailable}>
+        <Link className="text-brand-700 underline" href="/nurse">
+          {tv.notAvailableHint}
+        </Link>
       </EmptyState>
     );
   }
@@ -106,7 +114,7 @@ function Visit({ id }: { id: string }) {
     };
     const hasData = [payload.systolic, payload.pulse, payload.temperature, payload.spo2, payload.generalCondition].some((v) => v !== undefined) || payload.symptoms.length > 0;
     if (!hasData) {
-      setFormError('Record at least one vital sign, symptom or the general condition.');
+      setFormError(tv.needData);
       return;
     }
     setSaving(true);
@@ -115,9 +123,9 @@ function Visit({ id }: { id: string }) {
       await queueObservation(visit!.patient.id, id, payload);
       setVitals(emptyVitals);
       setSymptoms([]);
-      setSaved('Saved on this device. It syncs to the server automatically — see the status at the top.');
+      setSaved(tv.saved);
     } catch {
-      setFormError('Could not save on this device. Check browser storage settings.');
+      setFormError(tv.storageError);
     } finally {
       setSaving(false);
     }
@@ -128,7 +136,7 @@ function Visit({ id }: { id: string }) {
     setSaving(true);
     try {
       await queueFollowUpStatus(id, visit!.patient.id, { status: 'COMPLETED', outcome: outcome.trim() || undefined, patientStatus });
-      setSaved('Visit completion saved on this device. It syncs to the server automatically.');
+      setSaved(tv.completedSaved);
     } finally {
       setSaving(false);
     }
@@ -141,16 +149,16 @@ function Visit({ id }: { id: string }) {
   return (
     <div className="space-y-4">
       <PageHeader
-        back={{ href: '/nurse', label: 'Home visits' }}
-        eyebrow="Home visit"
+        back={{ href: '/nurse', label: tv.back }}
+        eyebrow={tv.eyebrow}
         title={visit.patient.fullName}
         subtitle={
           <span className="flex flex-wrap items-center gap-2">
             <span>
-              {age(visit.patient.birthDate)} y · {visit.patient.sex === 'MALE' ? 'Male' : 'Female'}
+              {t.common.years(age(visit.patient.birthDate))} · {visit.patient.sex === 'MALE' ? t.common.male : t.common.female}
             </span>
             <Badge tone={status === 'COMPLETED' ? 'green' : status === 'IN_PROGRESS' ? 'brand' : 'blue'}>
-              {status === 'COMPLETED' ? 'Completed' : status === 'IN_PROGRESS' ? 'Visit in progress' : 'Scheduled'}
+              {t.enums.followUpStatus[status]}
             </Badge>
             <RiskBadge level={patient.data?.riskLevel ?? visit.patient.riskLevel} />
           </span>
@@ -165,7 +173,7 @@ function Visit({ id }: { id: string }) {
           description={<span className={cx(due.overdue && 'font-semibold text-red-700')}>{due.text}</span>}
           action={<PriorityBadge priority={visit.referral.priority} />}
         >
-          Visit brief
+          {tv.brief}
         </CardTitle>
         <p className="text-sm font-medium text-slate-900">{visit.referral.reason}</p>
         {visit.patient.diagnosisNote && visit.patient.diagnosisNote !== visit.referral.reason && (
@@ -180,7 +188,7 @@ function Visit({ id }: { id: string }) {
               href={`tel:${visit.patient.phone}`}
               className="inline-flex h-10 items-center gap-2 rounded-[var(--radius-control)] border border-slate-300 px-4 font-semibold text-slate-800 hover:bg-slate-50"
             >
-              <Icon name="phone" /> Call patient
+              <Icon name="phone" /> {tv.callPatient}
             </a>
           )}
         </div>
@@ -191,7 +199,7 @@ function Visit({ id }: { id: string }) {
           tone="green"
           action={
             <button className="text-xs font-semibold underline" onClick={() => setSaved(null)}>
-              Dismiss
+              {t.common.dismiss}
             </button>
           }
         >
@@ -202,10 +210,10 @@ function Visit({ id }: { id: string }) {
         <Alert
           key={op.localOperationId}
           tone="red"
-          title={`${op.meta?.label ?? 'Change'} was rejected by the server`}
+          title={tv.rejectedTitle(op.meta?.label && OP_LABEL[op.meta.label] ? tv.labels[OP_LABEL[op.meta.label]] : tv.labels.observation)}
           action={
             <Button variant="secondary" size="sm" onClick={() => void getSyncEngine().discard(op.localOperationId)}>
-              Discard
+              {tv.discard}
             </Button>
           }
         >
@@ -215,29 +223,32 @@ function Visit({ id }: { id: string }) {
 
       {status !== 'COMPLETED' && (
         <Card>
-          <CardTitle description="Saved on this device first — works without internet">
+          <CardTitle description={tv.recordDesc}>
             <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-600 text-xs text-white">1</span>
-            Record observation
+            {tv.record}
           </CardTitle>
           <form onSubmit={saveVitals} className="space-y-5">
             {formError && <Alert>{formError}</Alert>}
             <fieldset>
-              <legend className="mb-2 text-sm font-semibold text-slate-900">Vital signs</legend>
+              <legend className="mb-2 text-sm font-semibold text-slate-900">{tv.vitals}</legend>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <Field label="Systolic BP (mmHg)" htmlFor="sys"><Input id="sys" type="number" inputMode="numeric" min={50} max={260} value={vitals.systolic} onChange={setV('systolic')} /></Field>
-                <Field label="Diastolic BP (mmHg)" htmlFor="dia"><Input id="dia" type="number" inputMode="numeric" min={30} max={160} value={vitals.diastolic} onChange={setV('diastolic')} /></Field>
-                <Field label="Pulse (bpm)" htmlFor="pulse"><Input id="pulse" type="number" inputMode="numeric" min={20} max={250} value={vitals.pulse} onChange={setV('pulse')} /></Field>
-                <Field label="Temperature (°C)" htmlFor="temp"><Input id="temp" type="number" inputMode="decimal" step="0.1" min={30} max={44} value={vitals.temperature} onChange={setV('temperature')} /></Field>
-                <Field label="SpO₂ (%)" htmlFor="spo2"><Input id="spo2" type="number" inputMode="numeric" min={50} max={100} value={vitals.spo2} onChange={setV('spo2')} /></Field>
-                <Field label="General condition" htmlFor="cond">
+                <Field label={tv.systolic} htmlFor="sys"><Input id="sys" type="number" inputMode="numeric" min={50} max={260} value={vitals.systolic} onChange={setV('systolic')} /></Field>
+                <Field label={tv.diastolic} htmlFor="dia"><Input id="dia" type="number" inputMode="numeric" min={30} max={160} value={vitals.diastolic} onChange={setV('diastolic')} /></Field>
+                <Field label={tv.pulse} htmlFor="pulse"><Input id="pulse" type="number" inputMode="numeric" min={20} max={250} value={vitals.pulse} onChange={setV('pulse')} /></Field>
+                <Field label={tv.temperature} htmlFor="temp"><Input id="temp" type="number" inputMode="decimal" step="0.1" min={30} max={44} value={vitals.temperature} onChange={setV('temperature')} /></Field>
+                <Field label={tv.spo2} htmlFor="spo2"><Input id="spo2" type="number" inputMode="numeric" min={50} max={100} value={vitals.spo2} onChange={setV('spo2')} /></Field>
+                <Field label={tv.condition} htmlFor="cond">
                   <Select id="cond" value={vitals.generalCondition} onChange={setV('generalCondition')}>
-                    <option value="">Not assessed</option><option value="GOOD">Good</option><option value="FAIR">Fair</option><option value="POOR">Poor</option><option value="CRITICAL">Critical</option>
+                    <option value="">{t.enums.condition.none}</option>
+                    {(['GOOD', 'FAIR', 'POOR', 'CRITICAL'] as const).map((c) => (
+                      <option key={c} value={c}>{t.enums.condition[c]}</option>
+                    ))}
                   </Select>
                 </Field>
               </div>
             </fieldset>
             <fieldset>
-              <legend className="mb-2 text-sm font-semibold text-slate-900">Symptoms</legend>
+              <legend className="mb-2 text-sm font-semibold text-slate-900">{tv.symptoms}</legend>
               <div className="flex flex-wrap gap-2">
                 {SYMPTOMS.map((s) => {
                   const on = symptoms.includes(s);
@@ -253,27 +264,27 @@ function Visit({ id }: { id: string }) {
                       )}
                     >
                       {on && <Icon name="check" className="h-3.5 w-3.5" />}
-                      {s}
+                      {t.enums.symptom[s] ?? s}
                     </button>
                   );
                 })}
               </div>
-              <label htmlFor="other" className="sr-only">Other symptoms</label>
-              <Input id="other" className="mt-3" placeholder="Other symptoms, comma separated (any language)" maxLength={300} value={vitals.other} onChange={setV('other')} />
+              <label htmlFor="other" className="sr-only">{tv.otherSymptoms}</label>
+              <Input id="other" className="mt-3" placeholder={tv.otherSymptoms} maxLength={300} value={vitals.other} onChange={setV('other')} />
             </fieldset>
-            <Field label="Notes" htmlFor="notes" optional hint="Any language — e.g. what the patient or family reports">
+            <Field label={tv.notes} htmlFor="notes" optional hint={tv.notesHint}>
               <Textarea id="notes" rows={3} maxLength={1000} value={vitals.notes} onChange={setV('notes')} />
             </Field>
             <Button type="submit" size="lg" loading={saving} className="w-full sm:w-auto">
               <Icon name={sync.online ? 'check' : 'device'} className="h-5 w-5" />
-              {sync.online ? 'Save observation' : 'Save on this device'}
+              {sync.online ? tv.saveOnline : tv.saveOffline}
             </Button>
           </form>
         </Card>
       )}
 
       <Card>
-        <CardTitle description={localObs.length ? `${localObs.length} waiting to sync` : undefined}>Observations this visit</CardTitle>
+        <CardTitle description={localObs.length ? tv.waiting(localObs.length) : undefined}>{tv.thisVisit}</CardTitle>
         <VitalsTable
           observations={[...localObs.map(toObservation), ...serverObs.filter((o) => !localObs.some((l) => l.entityId === o.clientId))]}
           pendingIds={new Set(localObs.map((o) => o.entityId))}
@@ -281,8 +292,8 @@ function Visit({ id }: { id: string }) {
       </Card>
 
       {!sync.online && localObs.length > 0 ? (
-        <Alert tone="blue" icon="sparkle" title="Risk assessment after sync">
-          The AI risk assessment runs on the server once these observations reach it.
+        <Alert tone="blue" icon="sparkle" title={tv.riskAfterSync}>
+          {tv.riskAfterSyncBody}
         </Alert>
       ) : (
         patient.data && <RiskCard assessment={patient.data.riskAssessments[0]} />
@@ -290,27 +301,27 @@ function Visit({ id }: { id: string }) {
 
       {status !== 'COMPLETED' && (
         <Card>
-          <CardTitle description="Close the visit when you are done">
+          <CardTitle description={tv.completeDesc}>
             <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-600 text-xs text-white">2</span>
-            Complete visit
+            {tv.complete}
           </CardTitle>
           <form onSubmit={complete} className="space-y-4">
-            <Field label="Outcome and plan" htmlFor="outcome">
-              <Textarea id="outcome" rows={3} maxLength={2000} value={outcome} onChange={(e) => setOutcome(e.target.value)} placeholder="e.g. BP controlled, medication adherence discussed" />
+            <Field label={tv.outcome} htmlFor="outcome">
+              <Textarea id="outcome" rows={3} maxLength={2000} value={outcome} onChange={(e) => setOutcome(e.target.value)} placeholder={tv.outcomePlaceholder} />
             </Field>
             {riskLevel === 'HIGH' && patientStatus === 'STABLE' && (
-              <Alert tone="amber">Risk is high for this patient. Confirm with the family doctor before closing follow-up as stable.</Alert>
+              <Alert tone="amber">{tv.highRiskWarning}</Alert>
             )}
-            <Field label="Patient status after visit" htmlFor="pst">
+            <Field label={tv.statusAfter} htmlFor="pst">
               <Select id="pst" value={patientStatus} onChange={(e) => setPatientStatus(e.target.value as 'STABLE' | 'IN_FOLLOW_UP')}>
-                <option value="STABLE">Stable — follow-up complete</option>
-                <option value="IN_FOLLOW_UP">Needs continued follow-up</option>
+                <option value="STABLE">{tv.stable}</option>
+                <option value="IN_FOLLOW_UP">{tv.continued}</option>
               </Select>
             </Field>
             <Button type="submit" variant="secondary" size="lg" className="w-full sm:w-auto" loading={saving} disabled={!hasObs}>
-              Complete visit
+              {tv.complete}
             </Button>
-            {!hasObs && <p className="text-xs text-slate-600">Record at least one observation first.</p>}
+            {!hasObs && <p className="text-xs text-slate-600">{tv.needObservation}</p>}
           </form>
         </Card>
       )}
@@ -320,13 +331,14 @@ function Visit({ id }: { id: string }) {
 
 function VisitPage() {
   const id = useSearchParams().get('id');
-  if (!id) return <EmptyState title="No visit selected" />;
+  const { t } = useI18n();
+  if (!id) return <EmptyState title={t.visit.noneSelected} />;
   return <Visit id={id} />;
 }
 
 export default function Page() {
   return (
-    <Suspense fallback={<Loading label="Loading visit…" />}>
+    <Suspense fallback={<Loading />}>
       <VisitPage />
     </Suspense>
   );

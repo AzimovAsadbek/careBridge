@@ -7,6 +7,7 @@ import { useResource } from '@/lib/resource';
 import { errorMessage } from '@/lib/api';
 import { age, fmtDate } from '@/lib/format';
 import { session } from '@/lib/session';
+import { useI18n } from '@/lib/i18n';
 import type { Paginated, PatientListItem, PatientStatus, Priority } from '@/lib/types';
 import { PatientStatusBadge, RiskBadge } from '@/components/badges';
 import { Button, ButtonLink, Card, EmptyState, ErrorState, Field, Icon, Input, Loading, PageHeader, Select } from '@/components/ui';
@@ -21,6 +22,8 @@ function PatientsList() {
   const [status, setStatus] = useState<PatientStatus | ''>('');
   const [risk, setRisk] = useState<Priority | ''>(RISKS.includes(initialRisk as Priority) ? (initialRisk as Priority) : '');
   const [page, setPage] = useState(1);
+  const { t } = useI18n();
+  const tp = t.patients;
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -41,36 +44,35 @@ function PatientsList() {
   return (
     <>
       <PageHeader
-        title="Patients"
-        subtitle={data ? `${data.total} patient${data.total === 1 ? '' : 's'} in your care area` : 'Patients in your care area'}
+        title={tp.title}
+        subtitle={data ? tp.subtitle(data.total) : tp.subtitleDefault}
         actions={
           session.user?.role !== 'NURSE' && (
             <ButtonLink href="/patients/new">
-              <Icon name="plus" /> New patient
+              <Icon name="plus" /> {tp.newPatient}
             </ButtonLink>
           )
         }
       />
 
       <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_12rem_12rem]">
-        <Field label="Search" htmlFor="q">
-          <Input id="q" type="search" placeholder="Patient name" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <Field label={tp.search} htmlFor="q">
+          <Input id="q" type="search" placeholder={tp.searchPlaceholder} value={search} onChange={(e) => setSearch(e.target.value)} />
         </Field>
-        <Field label="Care status" htmlFor="status">
+        <Field label={tp.careStatus} htmlFor="status">
           <Select id="status" value={status} onChange={(e) => { setStatus(e.target.value as PatientStatus | ''); setPage(1); }}>
-            <option value="">All statuses</option>
-            <option value="ADMITTED">In hospital</option>
-            <option value="DISCHARGED">Discharged</option>
-            <option value="IN_FOLLOW_UP">In follow-up</option>
-            <option value="STABLE">Stable</option>
+            <option value="">{tp.allStatuses}</option>
+            {(['ADMITTED', 'DISCHARGED', 'IN_FOLLOW_UP', 'STABLE'] as const).map((v) => (
+              <option key={v} value={v}>{t.enums.patientStatus[v]}</option>
+            ))}
           </Select>
         </Field>
-        <Field label="Risk" htmlFor="risk">
+        <Field label={tp.risk} htmlFor="risk">
           <Select id="risk" value={risk} onChange={(e) => { setRisk(e.target.value as Priority | ''); setPage(1); }}>
-            <option value="">Any risk</option>
-            <option value="HIGH">High risk</option>
-            <option value="MEDIUM">Medium risk</option>
-            <option value="LOW">Low risk</option>
+            <option value="">{tp.anyRisk}</option>
+            {RISKS.map((v) => (
+              <option key={v} value={v}>{t.enums.risk[v]}</option>
+            ))}
           </Select>
         </Field>
       </div>
@@ -78,22 +80,22 @@ function PatientsList() {
       {error ? (
         <ErrorState message={errorMessage(error)} onRetry={reload} />
       ) : loading && !data ? (
-        <Loading label="Loading patients…" rows={5} />
+        <Loading label={tp.loading} rows={5} />
       ) : !data?.items.length ? (
-        <EmptyState title={filtered ? 'No patients match these filters' : 'No patients yet'} icon="user">
-          {filtered ? 'Try a different name, status or risk level.' : 'Patients registered at your facility will appear here.'}
+        <EmptyState title={filtered ? tp.emptyFiltered : tp.empty} icon="user">
+          {filtered ? tp.emptyFilteredHint : tp.emptyHint}
         </EmptyState>
       ) : (
         <Card padded={false}>
           <table className="w-full text-left text-sm">
-            <caption className="sr-only">Patients</caption>
+            <caption className="sr-only">{tp.title}</caption>
             <thead className="hidden border-b border-line text-xs text-slate-600 md:table-header-group">
               <tr>
-                <th scope="col" className="px-5 py-2.5 font-medium">Patient</th>
-                <th scope="col" className="px-3 py-2.5 font-medium">Care status</th>
-                <th scope="col" className="px-3 py-2.5 font-medium">Risk</th>
-                <th scope="col" className="px-3 py-2.5 font-medium">Family doctor</th>
-                <th scope="col" className="px-5 py-2.5 text-right font-medium"><span className="sr-only">Open</span></th>
+                <th scope="col" className="px-5 py-2.5 font-medium">{tp.patient}</th>
+                <th scope="col" className="px-3 py-2.5 font-medium">{tp.careStatus}</th>
+                <th scope="col" className="px-3 py-2.5 font-medium">{tp.risk}</th>
+                <th scope="col" className="px-3 py-2.5 font-medium">{tp.familyDoctor}</th>
+                <th scope="col" className="px-5 py-2.5 text-right font-medium"><span className="sr-only">{t.common.open}</span></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -104,8 +106,8 @@ function PatientsList() {
                       {p.fullName}
                     </Link>
                     <p className="text-xs text-slate-500">
-                      {age(p.birthDate)} y · {p.sex === 'MALE' ? 'Male' : 'Female'} · {p.district}
-                      {p.dischargedAt && ` · discharged ${fmtDate(p.dischargedAt)}`}
+                      {t.common.years(age(p.birthDate))} · {p.sex === 'MALE' ? t.common.male : t.common.female} · {p.district}
+                      {p.dischargedAt && ` · ${tp.discharged(fmtDate(p.dischargedAt))}`}
                     </p>
                   </td>
                   <td className="inline-block pl-4 md:table-cell md:px-3 md:py-3">
@@ -125,10 +127,10 @@ function PatientsList() {
         </Card>
       )}
       {data && pages > 1 && (
-        <nav aria-label="Pagination" className="mt-4 flex items-center justify-between text-sm">
-          <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Previous</Button>
-          <span className="text-slate-600">Page {page} of {pages}</span>
-          <Button variant="secondary" size="sm" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>Next</Button>
+        <nav aria-label={t.common.pageOf(page, pages)} className="mt-4 flex items-center justify-between text-sm">
+          <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>{t.common.previous}</Button>
+          <span className="text-slate-600">{t.common.pageOf(page, pages)}</span>
+          <Button variant="secondary" size="sm" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>{t.common.next}</Button>
         </nav>
       )}
     </>
@@ -137,7 +139,7 @@ function PatientsList() {
 
 export default function PatientsPage() {
   return (
-    <Suspense fallback={<Loading label="Loading patients…" />}>
+    <Suspense fallback={<Loading />}>
       <PatientsList />
     </Suspense>
   );

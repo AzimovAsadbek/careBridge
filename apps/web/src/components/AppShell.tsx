@@ -7,17 +7,19 @@ import { session } from '@/lib/session';
 import { clearLocalData } from '@/lib/db';
 import type { Role, UserProfile } from '@/lib/types';
 import { SyncIndicator } from './SyncIndicator';
+import { LanguageSwitcher } from './LanguageSwitcher';
+import { useI18n } from '@/lib/i18n';
 import { cx, Skeleton } from './ui';
 
-const NAV: { href: string; label: string; short: string; roles: Role[]; icon: string }[] = [
-  { href: '/dashboard', label: 'Overview', short: 'Overview', roles: ['ADMIN'], icon: 'M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z' },
-  { href: '/doctor', label: 'Referrals', short: 'Referrals', roles: ['DOCTOR', 'ADMIN'], icon: 'M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 9 2 2 4-4' },
-  { href: '/nurse', label: 'Home visits', short: 'Visits', roles: ['NURSE'], icon: 'M3 12l2-2m0 0 7-7 7 7M5 10v10a1 1 0 0 0 1 1h3m10-11 2 2m-2-2v10a1 1 0 0 1-1 1h-3m-6 0a1 1 0 0 0 1-1v-4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 0 1 1m-6 0h6' },
-  { href: '/patients', label: 'Patients', short: 'Patients', roles: ['ADMIN', 'DOCTOR', 'NURSE'], icon: 'M17 20h5v-2a3 3 0 0 0-5.36-1.86M17 20H7m10 0v-2c0-.66-.13-1.28-.36-1.86M7 20H2v-2a3 3 0 0 1 5.36-1.86M7 20v-2c0-.66.13-1.28.36-1.86m0 0a5 5 0 0 1 9.28 0M15 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0z' },
-  { href: '/feedback', label: 'Patient voice', short: 'Feedback', roles: ['ADMIN'], icon: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-5l-5 5v-5z' },
+type NavKey = 'overview' | 'referrals' | 'visits' | 'patients' | 'voice';
+const NAV: { href: string; key: NavKey; roles: Role[]; icon: string }[] = [
+  { href: '/dashboard', key: 'overview', roles: ['ADMIN'], icon: 'M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z' },
+  { href: '/doctor', key: 'referrals', roles: ['DOCTOR', 'ADMIN'], icon: 'M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 9 2 2 4-4' },
+  { href: '/nurse', key: 'visits', roles: ['NURSE'], icon: 'M3 12l2-2m0 0 7-7 7 7M5 10v10a1 1 0 0 0 1 1h3m10-11 2 2m-2-2v10a1 1 0 0 1-1 1h-3m-6 0a1 1 0 0 0 1-1v-4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 0 1 1m-6 0h6' },
+  { href: '/patients', key: 'patients', roles: ['ADMIN', 'DOCTOR', 'NURSE'], icon: 'M17 20h5v-2a3 3 0 0 0-5.36-1.86M17 20H7m10 0v-2c0-.66-.13-1.28-.36-1.86M7 20H2v-2a3 3 0 0 1 5.36-1.86M7 20v-2c0-.66.13-1.28.36-1.86m0 0a5 5 0 0 1 9.28 0M15 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0z' },
+  { href: '/feedback', key: 'voice', roles: ['ADMIN'], icon: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-5l-5 5v-5z' },
 ];
 
-const ROLE_LABEL: Record<Role, string> = { ADMIN: 'Administrator', DOCTOR: 'Doctor', NURSE: 'Nurse' };
 
 function NavIcon({ d }: { d: string }) {
   return (
@@ -41,6 +43,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const { t } = useI18n();
+  const label = (k: NavKey, short = false) =>
+    ({
+      overview: t.nav.overview,
+      referrals: t.nav.referrals,
+      visits: short ? t.nav.visitsShort : t.nav.homeVisits,
+      patients: t.nav.patients,
+      voice: short ? t.nav.feedbackShort : t.nav.patientVoice,
+    })[k];
 
   useEffect(() => {
     const u = session.user;
@@ -58,7 +69,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="mx-auto max-w-6xl px-4 py-8">
         <Skeleton className="h-8 w-48" />
         <span className="sr-only" role="status">
-          Checking session…
+          {t.nav.checkingSession}
         </span>
       </div>
     );
@@ -75,7 +86,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-dvh md:flex">
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:shadow">
-        Skip to content
+        {t.nav.skip}
       </a>
 
       <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-line bg-white md:flex">
@@ -85,7 +96,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             CareBridge<span className="text-brand-600"> AI</span>
           </span>
         </Link>
-        <nav aria-label="Main" className="flex-1 space-y-0.5 px-3">
+        <nav aria-label={t.nav.main} className="flex-1 space-y-0.5 px-3">
           {nav.map((n) => (
             <Link
               key={n.href}
@@ -96,7 +107,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 isActive(n.href) ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
               )}
             >
-              <NavIcon d={n.icon} /> {n.label}
+              <NavIcon d={n.icon} /> {label(n.key)}
             </Link>
           ))}
         </nav>
@@ -108,12 +119,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-slate-900">{user.fullName}</p>
               <p className="truncate text-xs text-slate-500">
-                {ROLE_LABEL[user.role]} · {user.facility.name}
+                {t.roles[user.role]} · {user.facility.name}
               </p>
             </div>
           </div>
           <button onClick={signOut} className="mt-3 h-8 w-full rounded-[var(--radius-control)] border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-            Sign out
+            {t.nav.signOut}
           </button>
         </div>
       </aside>
@@ -124,17 +135,20 @@ export function AppShell({ children }: { children: ReactNode }) {
             <img src="/icon.svg" alt="" className="h-7 w-7" />
             <span className="text-[15px] font-semibold tracking-tight">CareBridge</span>
           </Link>
-          <p className="hidden truncate text-sm text-slate-500 md:block">
-            {ROLE_LABEL[user.role]} workspace · <span className="text-slate-700">{user.facility.name}</span>
+          <p className="hidden min-w-0 truncate text-sm text-slate-500 md:block">
+            {t.nav.workspace(t.roles[user.role])} · <span className="text-slate-700">{user.facility.name}</span>
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <SyncIndicator compact />
+            <div className="hidden md:block">
+              <LanguageSwitcher />
+            </div>
             <div className="relative md:hidden">
               <button
                 onClick={() => setMenuOpen((o) => !o)}
                 aria-expanded={menuOpen}
                 aria-haspopup="menu"
-                aria-label="Account menu"
+                aria-label={t.nav.accountMenu}
                 className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700"
               >
                 {initials(user.fullName)}
@@ -143,10 +157,11 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <div role="menu" className="absolute right-0 top-11 w-64 rounded-[var(--radius-card)] border border-line bg-white p-3 shadow-lg">
                   <p className="text-sm font-semibold text-slate-900">{user.fullName}</p>
                   <p className="text-xs text-slate-500">
-                    {ROLE_LABEL[user.role]} · {user.facility.name}
+                    {t.roles[user.role]} · {user.facility.name}
                   </p>
+                  <LanguageSwitcher className="mt-3" />
                   <button role="menuitem" onClick={signOut} className="mt-3 h-9 w-full rounded-[var(--radius-control)] border border-slate-300 text-sm font-semibold text-slate-700">
-                    Sign out
+                    {t.nav.signOut}
                   </button>
                 </div>
               )}
@@ -159,7 +174,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </main>
       </div>
 
-      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
+      <nav aria-label={t.nav.main} className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
         {nav.map((n) => (
           <Link
             key={n.href}
@@ -171,7 +186,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             )}
           >
             <NavIcon d={n.icon} />
-            {n.short}
+            {label(n.key, true)}
           </Link>
         ))}
       </nav>

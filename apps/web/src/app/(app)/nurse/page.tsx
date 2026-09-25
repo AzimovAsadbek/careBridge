@@ -8,6 +8,7 @@ import { age, dueIn, fmtDateTime } from '@/lib/format';
 import { useOutbox } from '@/lib/outbox';
 import { useSyncState } from '@/lib/sync';
 import type { NurseVisit } from '@/lib/types';
+import { useI18n } from '@/lib/i18n';
 import { FollowUpStatusBadge, PriorityBadge, RiskBadge } from '@/components/badges';
 import { Badge, EmptyState, ErrorState, Icon, Loading, PageHeader, cx } from '@/components/ui';
 import { SyncBanner } from '@/components/SyncIndicator';
@@ -16,6 +17,7 @@ export default function NursePage() {
   const { data, error, loading, stale, cachedAt, reload } = useResource<NurseVisit[]>('/follow-ups/mine', { offline: true });
   const sync = useSyncState();
   const local = useOutbox((op) => op.syncStatus !== 'synced');
+  const { t } = useI18n();
 
   // Refresh the worklist after a successful sync.
   useEffect(() => {
@@ -25,8 +27,8 @@ export default function NursePage() {
   return (
     <>
       <PageHeader
-        title="Home visits"
-        subtitle={data ? `${data.length} visit${data.length === 1 ? '' : 's'} assigned to you · works without internet` : 'Works without internet'}
+        title={t.nurse.title}
+        subtitle={data ? t.nurse.subtitle(data.length) : t.nurse.subtitleDefault}
       />
       <div className="mb-4">
         <SyncBanner savedAt={stale ? fmtDateTime(cachedAt) : null} />
@@ -34,10 +36,10 @@ export default function NursePage() {
       {error ? (
         <ErrorState message={errorMessage(error)} onRetry={reload} />
       ) : loading && !data ? (
-        <Loading label="Loading visits…" />
+        <Loading label={t.nurse.loading} />
       ) : !data?.length ? (
-        <EmptyState title="No visits assigned" icon="checkCircle">
-          When a doctor assigns you a home visit it appears here — open it once while online to use it offline.
+        <EmptyState title={t.nurse.empty} icon="checkCircle">
+          {t.nurse.emptyHint}
         </EmptyState>
       ) : (
         <ul className="space-y-3">
@@ -57,7 +59,7 @@ export default function NursePage() {
                     <div className="min-w-0">
                       <p className="text-base font-semibold text-slate-900">{v.patient.fullName}</p>
                       <p className="text-sm text-slate-600">
-                        {age(v.patient.birthDate)} y · {v.patient.address}
+                        {t.common.years(age(v.patient.birthDate))} · {v.patient.address}
                       </p>
                     </div>
                     <FollowUpStatusBadge status={v.status} />
@@ -68,7 +70,7 @@ export default function NursePage() {
                     <PriorityBadge priority={v.referral.priority} />
                     {pending > 0 && (
                       <Badge tone="amber">
-                        <Icon name="device" className="h-3 w-3" /> {pending} on device
+                        <Icon name="device" className="h-3 w-3" /> {t.sync.onDevice(pending)}
                       </Badge>
                     )}
                   </div>
@@ -78,7 +80,7 @@ export default function NursePage() {
                       {due.text}
                     </span>
                     <span className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700">
-                      {v.status === 'SCHEDULED' ? 'Start visit' : 'Continue'} <Icon name="chevronRight" className="h-4 w-4" />
+                      {v.status === 'SCHEDULED' ? t.nurse.start : t.nurse.continue} <Icon name="chevronRight" className="h-4 w-4" />
                     </span>
                   </div>
                 </Link>

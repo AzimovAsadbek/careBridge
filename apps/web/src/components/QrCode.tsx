@@ -10,5 +10,5 @@ export function QrCode({ value, size = 160 }: { value: string; size?: number }) 
       .then(setSrc)
       .catch(() => setSrc(null));
   }, [value, size]);
-  return src ? <img src={src} width={size} height={size} alt={`QR code linking to ${value}`} /> : <div style={{ width: size, height: size }} className="animate-pulse rounded bg-slate-100" />;
+  return src ? <img src={src} width={size} height={size} alt={`QR: ${value}`} /> : <div style={{ width: size, height: size }} className="animate-pulse rounded bg-slate-100" />;
 }

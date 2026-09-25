@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { useI18n } from '@/lib/i18n';
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ');
@@ -176,10 +177,11 @@ export function Skeleton({ className }: { className?: string }) {
 }
 
 /** Page-level loading placeholder that mirrors the layout instead of a lone spinner. */
-export function Loading({ label = 'Loading…', rows = 4 }: { label?: string; rows?: number }) {
+export function Loading({ label, rows = 4 }: { label?: string; rows?: number }) {
+  const { t } = useI18n();
   return (
     <div role="status" aria-live="polite" className="space-y-3">
-      <span className="sr-only">{label}</span>
+      <span className="sr-only">{label ?? t.common.loading}</span>
       <Skeleton className="h-7 w-56" />
       <Skeleton className="h-4 w-80 max-w-full" />
       <div className="space-y-2 pt-3">
@@ -225,14 +227,15 @@ export function Alert({
 }
 
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  const { t } = useI18n();
   return (
     <Alert
       tone="red"
-      title="Could not load data"
+      title={t.common.couldNotLoad}
       action={
         onRetry && (
           <Button variant="secondary" size="sm" onClick={onRetry}>
-            Try again
+            {t.common.tryAgain}
           </Button>
         )
       }
@@ -308,11 +311,12 @@ export function Field({
   htmlFor?: string;
   optional?: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <div>
       <label htmlFor={htmlFor} className="mb-1.5 block text-sm font-medium text-slate-800">
         {label}
-        {optional && <span className="ml-1 font-normal text-slate-500">(optional)</span>}
+        {optional && <span className="ml-1 font-normal text-slate-500">({t.common.optional})</span>}
       </label>
       {children}
       {hint && !error && <p className="mt-1.5 text-xs text-slate-500">{hint}</p>}
@@ -415,27 +419,30 @@ export function Stepper({ steps, label }: { steps: Step[]; label: string }) {
     late: 'border-red-600 bg-white text-red-700 ring-4 ring-red-100',
     upcoming: 'border-slate-300 bg-white text-slate-500',
   };
-  const stateText = { done: 'completed', current: 'in progress', late: 'overdue', upcoming: 'not started' };
-  // Container query: horizontal only when the stepper itself has room (≥ 42rem), not the screen.
+  const { t } = useI18n();
+  const stateText = t.stepper;
+  // Container query: horizontal only when the stepper itself has room. Long journeys (and longer
+  // Russian / Uzbek labels) need more width before switching to the horizontal layout.
+  const wide = steps.length > 5;
+  const L = wide
+    ? { ol: '@4xl:auto-cols-fr @4xl:grid-flow-col', li: '@4xl:flex-col @4xl:gap-2 @4xl:pb-0 @4xl:pr-3', line: '@4xl:left-6 @4xl:top-[11px] @4xl:h-0.5 @4xl:w-[calc(100%-1.5rem)]' }
+    : { ol: '@2xl:auto-cols-fr @2xl:grid-flow-col', li: '@2xl:flex-col @2xl:gap-2 @2xl:pb-0 @2xl:pr-3', line: '@2xl:left-6 @2xl:top-[11px] @2xl:h-0.5 @2xl:w-[calc(100%-1.5rem)]' };
   return (
     <div className="@container">
-      <ol aria-label={label} className="grid gap-0 @2xl:auto-cols-fr @2xl:grid-flow-col">
+      <ol aria-label={label} className={cx('grid gap-0', L.ol)}>
         {steps.map((s, i) => (
-          <li key={s.label} className="relative flex gap-3 pb-5 last:pb-0 @2xl:flex-col @2xl:gap-2 @2xl:pb-0 @2xl:pr-3">
+          <li key={s.label} className={cx('relative flex gap-3 pb-5 last:pb-0', L.li)}>
             {i < steps.length - 1 && (
               <span
                 aria-hidden
-                className={cx(
-                  'absolute left-[11px] top-6 h-[calc(100%-1.5rem)] w-0.5 @2xl:left-6 @2xl:top-[11px] @2xl:h-0.5 @2xl:w-[calc(100%-1.5rem)]',
-                  s.state === 'done' ? 'bg-emerald-600' : 'bg-slate-200',
-                )}
+                className={cx('absolute left-[11px] top-6 h-[calc(100%-1.5rem)] w-0.5', L.line, s.state === 'done' ? 'bg-emerald-600' : 'bg-slate-200')}
               />
             )}
             <span className={cx('relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold', marker[s.state])}>
               {s.state === 'done' ? <Icon name="check" className="h-3.5 w-3.5" /> : s.state === 'late' ? '!' : i + 1}
             </span>
             <div className="min-w-0">
-              <p className={cx('text-sm font-medium', s.state === 'upcoming' ? 'text-slate-500' : 'text-slate-900')}>
+              <p className={cx('text-sm font-medium [overflow-wrap:anywhere]', s.state === 'upcoming' ? 'text-slate-500' : 'text-slate-900')}>
                 {s.label}
                 <span className="sr-only"> — {stateText[s.state]}</span>
               </p>
