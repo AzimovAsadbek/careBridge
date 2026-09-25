@@ -34,8 +34,8 @@ export function DischargePanel({ patient, onDone, onCancel }: { patient: Patient
   }
 
   return (
-    <Card className="border-brand-200 ring-2 ring-brand-100">
-      <CardTitle>Discharge & create follow-up referral</CardTitle>
+    <Card className="border-brand-200 ring-1 ring-brand-100">
+      <CardTitle description="The family doctor receives an active follow-up referral with a deadline.">Discharge and refer for follow-up</CardTitle>
       <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
         {error && <div className="sm:col-span-2"><Alert>{error}</Alert></div>}
         <Field label="Follow-up priority" htmlFor="prio" hint={`Deadline: ${WINDOW[priority]}`}>
@@ -47,7 +47,7 @@ export function DischargePanel({ patient, onDone, onCancel }: { patient: Patient
         </Field>
         <Field label="Receiving family doctor" htmlFor="doc">
           <Select id="doc" required value={doctorId} onChange={(e) => setDoctorId(e.target.value)}>
-            <option value="">— Select —</option>
+            <option value="">Select doctor</option>
             {doctors.data?.map((d) => <option key={d.id} value={d.id}>{d.fullName} · {d.facility.name}</option>)}
           </Select>
         </Field>
@@ -55,12 +55,12 @@ export function DischargePanel({ patient, onDone, onCancel }: { patient: Patient
           <Field label="Reason for follow-up" htmlFor="reason"><Textarea id="reason" required minLength={3} maxLength={500} rows={2} value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
         </div>
         <div className="sm:col-span-2">
-          <Field label="Discharge summary for the family doctor" htmlFor="sum" hint="Medications, instructions, warning signs (optional)">
+          <Field label="Discharge summary for the family doctor" htmlFor="sum" optional hint="Medications, instructions, warning signs">
             <Textarea id="sum" maxLength={2000} rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} />
           </Field>
         </div>
-        <div className="flex gap-2 sm:col-span-2">
-          <Button type="submit" loading={saving}>Discharge patient</Button>
+        <div className="flex flex-wrap gap-2 border-t border-line pt-4 sm:col-span-2">
+          <Button type="submit" loading={saving}>Discharge and send referral</Button>
           <Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button>
         </div>
       </form>
