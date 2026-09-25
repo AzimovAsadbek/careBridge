@@ -144,6 +144,17 @@ The admin dashboard shows a ranked "needs attention now" worklist (overdue, AI-h
 
 ---
 
+## Languages: Oʻzbekcha · Русский · English
+
+The whole interface is available in **Uzbek (Latin), Russian and English**, including staff screens, the nurse's offline visit and the public QR form. Uzbek is the default (Russian-language devices start in Russian). Users switch with **UZ · RU · EN** in the header, on the login page, or on the QR form; the choice is saved on the device.
+
+- **UI text:** dependency-free typed dictionaries (`apps/web/src/lib/i18n/{en,uz,ru}.ts`). A missing translation is a TypeScript error. Russian uses proper plural forms; dates are formatted per language, with hand-written Uzbek month and day names.
+- **Server-generated content** is translated from stable codes, not English sentences: rule-based risk factors, rule recommendations, safety-layer warnings, continuity steps, dashboard insights and attention reasons.
+- **Gemini free text** (risk reasons, recommendation, warnings, feedback summary) is requested in English + Uzbek + Russian in the same call.
+  - Translations are stored only if both the English source and the translation pass the same safety checks (no medication/dosing advice, no diagnosis, identifiers scrubbed).
+  - If a check fails, the English text is shown.
+- **Patient data** (names, addresses, notes typed by staff) is shown exactly as entered.
+
 ## Care Continuity Score
 
 A **process metric, not a clinical score.** Each referral earns 20% per completed hand-off:
