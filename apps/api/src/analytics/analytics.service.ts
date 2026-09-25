@@ -77,6 +77,7 @@ export class AnalyticsService {
       feedbackTopics: topicRows.map((r) => ({ topic: r.topic, count: Number(r.count) })),
       attention,
       insights: this.insights({ highRisk, overdue, urgentFeedback, continuityRate, sentiment }),
+      insightItems: this.insightItems({ highRisk, overdue, urgentFeedback, continuityRate, sentiment }),
     };
   }
 
@@ -109,9 +110,28 @@ export class AnalyticsService {
           r.patient.riskLevel === Priority.HIGH ? 'AI risk: HIGH' : null,
           r.priority === Priority.HIGH ? 'High-priority discharge' : null,
         ].filter(Boolean) as string[],
+        // Stable codes so clients can localise (uz / ru / en).
+        reasonCodes: [
+          r.deadline < now ? 'overdue' : null,
+          r.patient.riskLevel === Priority.HIGH ? 'ai_high' : null,
+          r.priority === Priority.HIGH ? 'priority_high' : null,
+        ].filter(Boolean) as string[],
       }))
       .sort((a, b) => urgency(b) - urgency(a) || a.deadline.getTime() - b.deadline.getTime())
       .slice(0, 8);
+  }
+
+  /** Same insights as codes + values, for localised clients. */
+  private insightItems(d: { highRisk: number; overdue: number; urgentFeedback: number; continuityRate: number; sentiment: Record<string, number> }) {
+    const out: { code: string; value: number }[] = [];
+    if (d.highRisk) out.push({ code: 'high_risk', value: d.highRisk });
+    if (d.overdue) out.push({ code: 'overdue', value: d.overdue });
+    if (d.urgentFeedback) out.push({ code: 'urgent_feedback', value: d.urgentFeedback });
+    const totalFb = d.sentiment.POSITIVE + d.sentiment.NEUTRAL + d.sentiment.NEGATIVE;
+    if (totalFb >= 5 && d.sentiment.NEGATIVE / totalFb > 0.4) out.push({ code: 'negative_feedback', value: 40 });
+    if (d.continuityRate && d.continuityRate < 60) out.push({ code: 'low_continuity', value: d.continuityRate });
+    if (!out.length) out.push({ code: 'all_clear', value: 0 });
+    return out;
   }
 
   /** Plain-language operational insights (decision support for coordinators). */

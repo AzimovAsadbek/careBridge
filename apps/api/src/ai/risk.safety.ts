@@ -1,12 +1,17 @@
 import { AiEngine } from '@prisma/client';
-import { GeminiRisk, Level, RiskFactor, RiskResult } from './ai.schemas';
+import { GeminiRisk, Level, RiskFactor, RiskResult, TextTranslations, TRANSLATION_LOCALES } from './ai.schemas';
 import { levelRank, RISK_ACTIONS } from './risk.rules';
 
 export interface FinalRisk extends RiskResult {
   engine: AiEngine;
   confidence: number | null;
   warnings: string[];
+  /** Uzbek / Russian versions of AI free text that passed the same safety checks. */
+  i18n: TextTranslations | null;
 }
+
+/** A translation is used only if its English source survived unchanged and the translation itself is safe. */
+const safeTranslation = (tr: string | undefined) => !!tr && !isPrescriptive(tr) && stripDiagnosis(tr) === tr.trim();
 
 /** Medication / dosing language. The product is decision support: AI may not prescribe. */
 const PRESCRIPTIVE =
@@ -55,6 +60,7 @@ export function applyRiskSafetyLayer(
       ...rules,
       engine: opts.aiConfigured ? AiEngine.FALLBACK_RULE_ENGINE : AiEngine.RULE_ENGINE,
       confidence: null,
+      i18n: null,
       warnings: opts.aiConfigured
         ? [`AI review unavailable (${opts.failure ?? 'error'}); showing the rule-based assessment.`]
         : [],
@@ -90,16 +96,36 @@ export function applyRiskSafetyLayer(
     ...aiReasons.map((label, i) => ({ code: `ai_${i}`, label, weight: 0, source: 'ai' as const })),
   ];
 
+  const finalWarnings = [
+    ...warnings,
+    ...ai.warnings.filter((w) => !isPrescriptive(w)).map(stripDiagnosis).filter((w): w is string => !!w),
+  ].slice(0, 8);
+
+  let i18n: TextTranslations | null = null;
+  if (ai.translations) {
+    i18n = {};
+    for (const loc of TRANSLATION_LOCALES) {
+      const tr = ai.translations[loc];
+      const map: Record<string, string> = {};
+      ai.reasons.forEach((en, i) => {
+        if (aiReasons.includes(en) && safeTranslation(tr.reasons[i])) map[en] = tr.reasons[i].trim();
+      });
+      if (recommendedAction === ai.recommendedAction && safeTranslation(tr.recommendedAction)) map[recommendedAction] = tr.recommendedAction.trim();
+      ai.warnings.forEach((en, i) => {
+        if (finalWarnings.includes(en) && safeTranslation(tr.warnings[i])) map[en] = tr.warnings[i].trim();
+      });
+      i18n[loc] = map;
+    }
+  }
+
   return {
+    i18n,
     riskLevel: level,
     score: rules.score,
     factors,
     recommendedAction,
     engine: aiLowered ? AiEngine.GEMINI_WITH_RULE_OVERRIDE : AiEngine.GEMINI,
     confidence: ai.confidence,
-    warnings: [
-      ...warnings,
-      ...ai.warnings.filter((w) => !isPrescriptive(w)).map(stripDiagnosis).filter((w): w is string => !!w),
-    ].slice(0, 8),
+    warnings: finalWarnings,
   };
 }

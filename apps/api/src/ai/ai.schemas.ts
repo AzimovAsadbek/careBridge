@@ -21,12 +21,26 @@ export const RiskResultSchema = z.object({
 export type RiskResult = z.infer<typeof RiskResultSchema>;
 
 /** Contract Gemini must satisfy for risk review. Anything else is rejected → rule fallback. */
+/** Supported UI languages besides English (the canonical, safety-checked language). */
+export const TRANSLATION_LOCALES = ['uz', 'ru'] as const;
+export type TranslationLocale = (typeof TRANSLATION_LOCALES)[number];
+/** English text → translated text, per locale. Only safety-checked pairs are stored. */
+export type TextTranslations = Partial<Record<TranslationLocale, Record<string, string>>>;
+
+const RiskTranslation = z.object({
+  reasons: z.array(z.string().max(300)).max(6),
+  recommendedAction: z.string().max(400),
+  warnings: z.array(z.string().max(300)).max(5),
+});
+
 export const GeminiRiskSchema = z.object({
   riskLevel: z.enum(LEVELS),
   reasons: z.array(z.string().min(1).max(200)).max(6),
   recommendedAction: z.string().min(1).max(300),
   confidence: z.number().min(0).max(1),
   warnings: z.array(z.string().min(1).max(200)).max(5),
+  /** Same content in Uzbek (Latin) and Russian, same order. Optional: English is always the fallback. */
+  translations: z.object({ uz: RiskTranslation, ru: RiskTranslation }).optional(),
 });
 export type GeminiRisk = z.infer<typeof GeminiRiskSchema>;
 
@@ -62,9 +76,10 @@ export const GeminiFeedbackSchema = z.object({
   topics: z.array(z.enum(FEEDBACK_TOPICS)).max(5),
   safetySignal: z.boolean(),
   summary: z.string().max(200),
+  translations: z.object({ uz: z.object({ summary: z.string().max(300) }), ru: z.object({ summary: z.string().max(300) }) }).optional(),
 });
 export type GeminiFeedback = z.infer<typeof GeminiFeedbackSchema>;
 /** Shape stored for every feedback item, whichever engine produced it. */
-export type FeedbackAnalysisResult = GeminiFeedback;
+export type FeedbackAnalysisResult = Omit<GeminiFeedback, 'translations'>;
 /** @deprecated kept for the smoke test name; same contract. */
 export const FeedbackAnalysisSchema = GeminiFeedbackSchema;

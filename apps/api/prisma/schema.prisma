@@ -249,6 +249,8 @@ model RiskAssessment {
   model             String?
   /// True while the rule-based result is shown and the AI review is still running.
   aiPending         Boolean      @default(false)
+  /// { uz: { english: translated }, ru: {...} } for AI free text that passed safety checks.
+  i18n              Json?
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @default(now()) @updatedAt
 
@@ -289,6 +291,8 @@ model FeedbackAnalysis {
   provider   String?
   model      String?
   aiPending  Boolean   @default(false)
+  /// Uzbek / Russian versions of the AI summary.
+  i18n       Json?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @default(now()) @updatedAt
 

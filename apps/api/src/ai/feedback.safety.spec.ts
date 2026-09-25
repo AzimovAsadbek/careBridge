@@ -37,6 +37,16 @@ describe('applyFeedbackSafetyLayer', () => {
     expect(r).toMatchObject({ engine: AiEngine.FALLBACK_RULE_ENGINE, priority: 'HIGH', safetySignal: true });
   });
 
+  it('stores scrubbed Uzbek / Russian summaries', () => {
+    const r = applyFeedbackSafetyLayer(
+      waiting,
+      ai({ summary: 'Long wait.', translations: { uz: { summary: 'Uzoq kutish. Tel +998 90 123 45 67' }, ru: { summary: 'Долгое ожидание.' } } }),
+      { aiConfigured: true },
+    );
+    expect(r.i18n?.uz?.['Long wait.']).toBe('Uzoq kutish. Tel [number removed]');
+    expect(r.i18n?.ru?.['Long wait.']).toBe('Долгое ожидание.');
+  });
+
   it('scrubs phone numbers and e-mails from summaries', () => {
     expect(scrubSummary('Call +998 90 123 45 67 or a@b.uz')).toBe('Call [number removed] or [email removed]');
   });

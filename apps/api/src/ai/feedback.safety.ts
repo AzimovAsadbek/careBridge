@@ -1,9 +1,11 @@
 import { AiEngine } from '@prisma/client';
-import { FeedbackAnalysisResult, GeminiFeedback } from './ai.schemas';
+import { FeedbackAnalysisResult, GeminiFeedback, TextTranslations, TRANSLATION_LOCALES } from './ai.schemas';
 
 export interface FinalFeedback extends FeedbackAnalysisResult {
   engine: AiEngine;
   warnings: string[];
+  /** Uzbek / Russian summary (scrubbed of identifiers like the English one). */
+  i18n: TextTranslations | null;
 }
 
 const SAFETY_CATEGORIES = new Set(['corruption', 'clinical_safety', 'staff_behavior']);
@@ -30,6 +32,7 @@ export function applyFeedbackSafetyLayer(
       priority: rules.safetySignal ? 'HIGH' : rules.priority,
       engine: opts.aiConfigured ? AiEngine.FALLBACK_RULE_ENGINE : AiEngine.RULE_ENGINE,
       warnings: opts.aiConfigured ? [`AI classification unavailable (${opts.failure ?? 'error'}); keyword rules used.`] : [],
+      i18n: null,
     };
   }
 
@@ -53,13 +56,24 @@ export function applyFeedbackSafetyLayer(
     warnings.push('Gemini did not flag a safety concern, but safety keywords were found. Please review.');
   }
 
+  const summary = scrubSummary(ai.summary);
+  let i18n: TextTranslations | null = null;
+  if (ai.translations && summary) {
+    i18n = {};
+    for (const loc of TRANSLATION_LOCALES) {
+      const tr = ai.translations[loc]?.summary?.trim();
+      i18n[loc] = tr ? { [summary]: scrubSummary(tr) } : {};
+    }
+  }
+
   return {
+    i18n,
     category,
     sentiment: ai.sentiment,
     priority,
     topics: ai.topics.length ? ai.topics : rules.topics,
     safetySignal,
-    summary: scrubSummary(ai.summary),
+    summary,
     engine: overridden ? AiEngine.GEMINI_WITH_RULE_OVERRIDE : AiEngine.GEMINI,
     warnings,
   };

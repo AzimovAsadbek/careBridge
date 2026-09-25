@@ -81,6 +81,49 @@ describe('applyRiskSafetyLayer — AI may never lower a safety risk', () => {
     expect(r.recommendedAction).toBe(high.recommendedAction);
   });
 
+  it('keeps only safety-checked Uzbek / Russian translations', () => {
+    const tr = (reasons: string[], action: string) => ({ reasons, recommendedAction: action, warnings: ['BP qayd etilmagan'] });
+    const r = applyRiskSafetyLayer(
+      high,
+      gemini({
+        riskLevel: 'HIGH',
+        reasons: ['SpO2 fell to 89%', 'Give 40 mg furosemide'],
+        recommendedAction: 'Physician review today.',
+        warnings: ['Blood pressure missing'],
+        translations: {
+          uz: tr(['SpO2 89% gacha tushgan', '40 mg furosemid bering'], 'Bugun shifokor ko‘rigi.'),
+          ru: tr(['SpO2 снизилась до 89%', 'Дайте 40 мг фуросемида'], 'Осмотр врача сегодня.'),
+        },
+      }),
+      { aiConfigured: true },
+    );
+    expect(r.i18n?.uz).toEqual({
+      'SpO2 fell to 89%': 'SpO2 89% gacha tushgan',
+      'Physician review today.': 'Bugun shifokor ko‘rigi.',
+      'Blood pressure missing': 'BP qayd etilmagan',
+    });
+    expect(r.i18n?.ru?.['SpO2 fell to 89%']).toBe('SpO2 снизилась до 89%');
+    // The withheld (prescriptive) reason has no translation either.
+    expect(Object.values(r.i18n?.ru ?? {})).not.toContain('Дайте 40 мг фуросемида');
+  });
+
+  it('drops a translation that is itself diagnostic even if English was clean', () => {
+    const r = applyRiskSafetyLayer(
+      high,
+      gemini({
+        riskLevel: 'HIGH',
+        reasons: ['Cannot lie flat at night'],
+        translations: {
+          uz: { reasons: ['Tashxis: yurak yetishmovchiligi'], recommendedAction: 'Shifokor ko‘rigi', warnings: [] },
+          ru: { reasons: ['Не может лежать ночью'], recommendedAction: 'Осмотр врача', warnings: [] },
+        },
+      }),
+      { aiConfigured: true },
+    );
+    expect(r.i18n?.uz?.['Cannot lie flat at night']).toBeUndefined();
+    expect(r.i18n?.ru?.['Cannot lie flat at night']).toBe('Не может лежать ночью');
+  });
+
   it('marks FALLBACK_RULE_ENGINE when AI is configured but failed', () => {
     const r = applyRiskSafetyLayer(high, null, { aiConfigured: true, failure: 'quota' });
     expect(r).toMatchObject({ riskLevel: 'HIGH', engine: AiEngine.FALLBACK_RULE_ENGINE, confidence: null });
