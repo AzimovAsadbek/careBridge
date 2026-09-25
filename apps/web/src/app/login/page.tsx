@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { api, errorMessage } from '@/lib/api';
 import { homeFor, session } from '@/lib/session';
 import type { UserProfile } from '@/lib/types';
-import { Alert, Button, Field, Input } from '@/components/ui';
+import { Alert, Button, Field, Icon, Input, cx } from '@/components/ui';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { useI18n } from '@/lib/i18n';
 
@@ -51,21 +51,28 @@ function LoginForm() {
       <Field label={t.login.password} htmlFor="password">
         <Input id="password" type="password" autoComplete="current-password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
       </Field>
-      <Button type="submit" loading={loading} className="w-full">
+      <Button type="submit" size="lg" loading={loading} className="w-full">
         {t.login.signIn}
       </Button>
       {process.env.NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS !== 'false' && (
-        <div className="rounded-[var(--radius-control)] border border-line bg-slate-50 p-3">
-          <p className="mb-2 text-xs text-slate-600">
-            <span className="font-semibold text-slate-800">{t.login.demoAccounts}</span> · {t.login.password_} <span className="font-mono">CareBridge2026!</span>
-          </p>
+        <div className="border-t border-line-soft pt-5">
+          <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-2 text-xs">
+            <span className="font-medium text-slate-700">{t.login.demoAccounts}</span>
+            <span className="text-slate-500">
+              {t.login.password_} <span className="font-mono text-slate-700">CareBridge2026!</span>
+            </span>
+          </div>
           <div className="grid grid-cols-2 gap-2">
             {DEMO.map((d) => (
               <button
                 key={d.email}
                 type="button"
+                aria-pressed={email === d.email}
                 onClick={() => setEmail(d.email)}
-                className="h-9 rounded-[var(--radius-control)] border border-slate-300 bg-white px-2 text-left text-xs font-medium text-slate-800 hover:border-brand-600"
+                className={cx(
+                  'min-h-11 rounded-[var(--radius-control)] px-3 py-2 text-left text-[13px] transition-colors',
+                  email === d.email ? 'bg-brand-50 font-medium text-brand-800 ring-1 ring-inset ring-brand-600' : 'text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-50',
+                )}
               >
                 {t.login.demo[d.key]}
               </button>
@@ -80,26 +87,30 @@ function LoginForm() {
 export default function LoginPage() {
   const { t } = useI18n();
   return (
-    <div className="grid min-h-dvh lg:grid-cols-2">
-      <section className="hidden flex-col justify-between bg-brand-900 p-12 text-brand-50 lg:flex">
-        <div className="flex items-center gap-3">
+    <div className="grid min-h-dvh lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+      <section className="relative hidden flex-col justify-between overflow-hidden bg-brand-900 p-12 text-brand-50 lg:flex">
+        <div aria-hidden className="absolute -right-24 -top-24 h-80 w-80 rounded-full bg-brand-700/40 blur-3xl" />
+        <div className="relative flex items-center gap-3">
           <img src="/icon.svg" alt="" className="h-9 w-9" />
           <span className="text-lg font-semibold">CareBridge AI</span>
         </div>
-        <div>
-          <p className="text-3xl font-semibold leading-tight text-white">{t.login.heroTitle}</p>
-          <ul className="mt-8 space-y-3 text-sm text-brand-100">
+        <div className="relative max-w-md">
+          <p className="text-[28px] font-semibold leading-tight tracking-tight text-white">{t.login.heroTitle}</p>
+          <ul className="mt-8 space-y-4 text-sm leading-relaxed text-brand-100">
             {t.login.hero.map((h) => (
-              <li key={h}>{h}</li>
+              <li key={h} className="flex gap-3">
+                <Icon name="checkCircle" className="mt-0.5 h-4 w-4 text-brand-200" />
+                {h}
+              </li>
             ))}
           </ul>
         </div>
-        <p className="text-xs text-brand-200">{t.login.demoEnv}</p>
+        <p className="relative text-xs text-brand-200">{t.login.demoEnv}</p>
       </section>
 
-      <main className="relative flex items-center justify-center px-4 py-16">
+      <main className="relative flex items-center justify-center px-4 py-20">
         <LanguageSwitcher className="absolute right-4 top-4" />
-        <div className="w-full max-w-sm">
+        <div className="w-full max-w-[400px]">
           <div className="mb-8 flex items-center gap-3 lg:hidden">
             <img src="/icon.svg" alt="" className="h-10 w-10" />
             <div>
@@ -107,11 +118,16 @@ export default function LoginPage() {
               <p className="text-sm text-slate-600">{t.login.tagline}</p>
             </div>
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{t.login.title}</h1>
-          <p className="mb-6 mt-1 text-sm text-slate-600">{t.login.subtitle}</p>
-          <Suspense>
-            <LoginForm />
-          </Suspense>
+          <div className="rounded-[var(--radius-card)] border border-line bg-white p-6 shadow-[var(--shadow-card)] sm:p-8">
+            <h1 className="text-[22px] font-semibold tracking-tight text-slate-900">{t.login.title}</h1>
+            <p className="mb-6 mt-1 text-sm text-slate-600">{t.login.subtitle}</p>
+            <Suspense>
+              <LoginForm />
+            </Suspense>
+          </div>
+          <p className="mt-6 flex items-center justify-center gap-1.5 text-xs text-slate-500 lg:hidden">
+            <Icon name="info" className="h-3.5 w-3.5" /> {t.login.demoEnv}
+          </p>
         </div>
       </main>
     </div>

@@ -10,7 +10,7 @@ import { usePollWhile } from '@/lib/poll';
 import { modelName } from '@/components/clinical';
 import { SentimentBadge } from '@/components/badges';
 import { QrCode } from '@/components/QrCode';
-import { Badge, Button, Card, EmptyState, ErrorState, Field, Icon, Loading, PageHeader, Select, Spinner, cx } from '@/components/ui';
+import { Badge, Button, Card, EmptyState, ErrorState, Icon, Loading, PageHeader, Select, Spinner, cx } from '@/components/ui';
 
 const PRIORITY_TONE: Record<Priority, 'red' | 'amber' | 'slate'> = { HIGH: 'red', MEDIUM: 'amber', LOW: 'slate' };
 
@@ -49,6 +49,12 @@ export default function FeedbackPage() {
   const { data, error, loading, reload } = useResource<Paginated<FeedbackItem>>(`/feedback?${qs}`);
   const facilities = useResource<Facility[]>('/facilities');
   const pages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
+  const filtered = !!(sentiment || priority);
+  const clear = () => {
+    setSentiment('');
+    setPriority('');
+    setPage(1);
+  };
   usePollWhile(!!data?.items.some((f) => f.analysis?.aiPending), reload);
 
   return (
@@ -63,24 +69,47 @@ export default function FeedbackPage() {
         }
       />
 
-      <div className="mb-4 flex flex-wrap items-end gap-3">
-        <Field label={tf.priority} htmlFor="fp">
-          <Select id="fp" className="w-44" value={priority} onChange={(e) => { setPriority(e.target.value as Priority | ''); setPage(1); }}>
-            <option value="">{tf.allPriorities}</option>
-            {(['HIGH', 'MEDIUM', 'LOW'] as const).map((v) => (
-              <option key={v} value={v}>{t.enums.priority[v]}</option>
-            ))}
-          </Select>
-        </Field>
-        <Field label={tf.sentiment} htmlFor="fs">
-          <Select id="fs" className="w-44" value={sentiment} onChange={(e) => { setSentiment(e.target.value as Sentiment | ''); setPage(1); }}>
-            <option value="">{tf.allSentiment}</option>
-            {(['NEGATIVE', 'NEUTRAL', 'POSITIVE'] as const).map((v) => (
-              <option key={v} value={v}>{t.enums.sentiment[v]}</option>
-            ))}
-          </Select>
-        </Field>
-        {data && <p className="pb-2 text-sm text-slate-600">{t.common.results(data.total)}</p>}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <Select
+          id="fp"
+          aria-label={tf.priority}
+          className="w-auto min-w-40"
+          value={priority}
+          onChange={(e) => {
+            setPriority(e.target.value as Priority | '');
+            setPage(1);
+          }}
+        >
+          <option value="">{tf.allPriorities}</option>
+          {(['HIGH', 'MEDIUM', 'LOW'] as const).map((v) => (
+            <option key={v} value={v}>
+              {t.enums.priorityFull[v]}
+            </option>
+          ))}
+        </Select>
+        <Select
+          id="fs"
+          aria-label={tf.sentiment}
+          className="w-auto min-w-40"
+          value={sentiment}
+          onChange={(e) => {
+            setSentiment(e.target.value as Sentiment | '');
+            setPage(1);
+          }}
+        >
+          <option value="">{tf.allSentiment}</option>
+          {(['NEGATIVE', 'NEUTRAL', 'POSITIVE'] as const).map((v) => (
+            <option key={v} value={v}>
+              {t.enums.sentiment[v]}
+            </option>
+          ))}
+        </Select>
+        {filtered && (
+          <Button variant="ghost" onClick={clear}>
+            {t.patients.clearFilters}
+          </Button>
+        )}
+        {data && <p className="ml-auto text-meta tabular-nums text-slate-500">{t.common.results(data.total)}</p>}
       </div>
 
       {error ? (
@@ -88,26 +117,41 @@ export default function FeedbackPage() {
       ) : loading && !data ? (
         <Loading label={tf.loading} />
       ) : !data?.items.length ? (
-        <EmptyState title={tf.empty} icon="qr">
-          {tf.emptyHint}
+        <EmptyState
+          title={filtered ? t.patients.emptyFiltered : tf.empty}
+          icon={filtered ? 'search' : 'qr'}
+          action={
+            filtered ? (
+              <Button variant="secondary" size="sm" onClick={clear}>
+                {t.patients.clearFilters}
+              </Button>
+            ) : undefined
+          }
+        >
+          {filtered ? tf.emptyFilteredHint : tf.emptyHint}
         </EmptyState>
       ) : (
-        <ul className="space-y-3">
-          {data.items.map((f) => {
-            const a = f.analysis;
-            return (
-              <li key={f.id}>
-                <Card className={cx(a?.safetySignal && 'border-red-200')}>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
+        <Card padded={false}>
+          <ul className="divide-y divide-line-soft">
+            {data.items.map((f) => {
+              const a = f.analysis;
+              return (
+                <li key={f.id} className={cx('relative px-4 py-4 sm:px-5', a?.safetySignal && 'bg-red-50/30')}>
+                  {a?.safetySignal && <span aria-hidden className="absolute inset-y-0 left-0 w-[3px] bg-red-500" />}
+                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
                     <div className="flex flex-wrap items-center gap-2">
                       {a?.safetySignal && (
                         <Badge tone="red">
                           <Icon name="alert" className="h-3.5 w-3.5" /> {tf.safetySignal}
                         </Badge>
                       )}
-                      {a && <Badge tone={PRIORITY_TONE[a.priority]}>{t.enums.priorityFull[a.priority]}</Badge>}
+                      {a && (
+                        <Badge tone={PRIORITY_TONE[a.priority]} dot>
+                          {t.enums.priorityFull[a.priority]}
+                        </Badge>
+                      )}
                       <Stars rating={f.rating} />
-                      <span className="text-sm text-slate-600">{t.enums.feedbackType[f.type]}</span>
+                      <span className="text-meta text-slate-500">{t.enums.feedbackType[f.type]}</span>
                     </div>
                     <span className="text-xs text-slate-500">
                       {f.facility.name}
@@ -115,26 +159,28 @@ export default function FeedbackPage() {
                     </span>
                   </div>
                   {f.text ? (
-                    <blockquote className="mt-3 border-l-2 border-slate-200 pl-3 text-sm text-slate-900">{f.text}</blockquote>
+                    <p className="mt-2.5 text-sm leading-relaxed text-slate-900">“{f.text}”</p>
                   ) : (
-                    <p className="mt-3 text-sm italic text-slate-500">{tf.ratingOnly}</p>
+                    <p className="mt-2.5 text-sm italic text-slate-500">{tf.ratingOnly}</p>
                   )}
                   {a ? (
-                    <div className="mt-4 rounded-[var(--radius-control)] bg-slate-50 p-3">
-                      <div className="flex flex-wrap items-center gap-2">
+                    <div className="mt-3 border-l-2 border-line pl-3">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <SentimentBadge sentiment={a.sentiment} />
-                        <Badge tone="blue">{t.enums.category[a.category] ?? a.category}</Badge>
+                        <Badge>{t.enums.category[a.category] ?? a.category}</Badge>
                         {a.topics.map((tp) => (
-                          <Badge key={tp}>{t.enums.topic[tp] ?? tp}</Badge>
+                          <span key={tp} className="text-xs text-slate-500">
+                            #{(t.enums.topic[tp] ?? tp).toLowerCase()}
+                          </span>
                         ))}
                       </div>
-                      {summaryOf(a) && <p className="mt-2 text-sm text-slate-700">{summaryOf(a)}</p>}
+                      {summaryOf(a) && <p className="mt-1.5 text-sm text-slate-700">{summaryOf(a)}</p>}
                       {a.warnings.map((w) => (
                         <p key={w} className="mt-1 flex gap-1.5 text-xs text-amber-800">
                           <Icon name="alert" className="mt-0.5 h-3.5 w-3.5" /> {localizeText(w, t)}
                         </p>
                       ))}
-                      <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-slate-500">
+                      <p className="mt-1.5 inline-flex items-center gap-1.5 text-xs text-slate-500">
                         {a.aiPending ? (
                           <>
                             <Spinner className="h-3 w-3" /> {tf.classifying}
@@ -151,16 +197,16 @@ export default function FeedbackPage() {
                   ) : (
                     <p className="mt-3 text-xs text-slate-500">{tf.pending}</p>
                   )}
-                </Card>
-              </li>
-            );
-          })}
-        </ul>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
       )}
       {data && pages > 1 && (
-        <nav aria-label={t.common.pageOf(page, pages)} className="mt-4 flex items-center justify-between text-sm">
+        <nav aria-label={t.common.pageOf(page, pages)} className="mt-4 flex items-center justify-between text-meta">
           <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>{t.common.previous}</Button>
-          <span className="text-slate-600">{t.common.pageOf(page, pages)}</span>
+          <span className="tabular-nums text-slate-500">{t.common.pageOf(page, pages)}</span>
           <Button variant="secondary" size="sm" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>{t.common.next}</Button>
         </nav>
       )}
@@ -168,20 +214,20 @@ export default function FeedbackPage() {
       <details className="group mt-8 rounded-[var(--radius-card)] border border-line bg-white shadow-[var(--shadow-card)]">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 sm:p-5">
           <span>
-            <span className="flex items-center gap-2 font-semibold text-slate-900">
+            <span className="flex items-center gap-2 text-section font-semibold text-slate-900">
               <Icon name="qr" /> {tf.qrTitle}
             </span>
-            <span className="mt-0.5 block text-sm text-slate-600">{tf.qrDesc}</span>
+            <span className="mt-0.5 block text-meta text-slate-500">{tf.qrDesc}</span>
           </span>
-          <Icon name="chevronRight" className="h-4 w-4 text-slate-500 transition-transform group-open:rotate-90" />
+          <Icon name="chevronDown" className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-180" />
         </summary>
-        <div className="flex gap-4 overflow-x-auto border-t border-line p-4 sm:p-5">
+        <div className="flex gap-3 overflow-x-auto border-t border-line-soft p-4 sm:p-5">
           {facilities.data?.map((fac) => {
             const url = `${origin}/f/${fac.publicCode}`;
             return (
-              <a key={fac.id} href={url} target="_blank" rel="noopener noreferrer" className="w-44 shrink-0 rounded-[var(--radius-control)] border border-line p-3 text-center hover:border-brand-200">
+              <a key={fac.id} href={url} target="_blank" rel="noopener noreferrer" className="w-44 shrink-0 rounded-[var(--radius-control)] p-3 text-center ring-1 ring-inset ring-line transition-colors hover:bg-slate-50">
                 {origin && <QrCode value={url} size={140} />}
-                <p className="mt-2 text-xs font-semibold text-slate-800">{fac.name}</p>
+                <p className="mt-2 text-xs font-medium text-slate-800">{fac.name}</p>
                 <p className="font-mono text-[11px] text-slate-500">{fac.publicCode}</p>
               </a>
             );

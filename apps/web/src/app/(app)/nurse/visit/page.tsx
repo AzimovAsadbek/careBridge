@@ -1,19 +1,18 @@
 'use client';
 
-import Link from 'next/link';
 import { Suspense, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useResource } from '@/lib/resource';
 import { errorMessage } from '@/lib/api';
-import { age, dueIn, fmtDateTime } from '@/lib/format';
+import { age, fmtDateTime } from '@/lib/format';
 import { queueFollowUpStatus, queueObservation, useOutbox } from '@/lib/outbox';
 import { getSyncEngine, useSyncState } from '@/lib/sync';
 import { usePollWhile } from '@/lib/poll';
 import type { GeneralCondition, NurseVisit, Observation, PatientDetail } from '@/lib/types';
 import type { OutboxOp } from '@/lib/db';
-import { PriorityBadge, RiskBadge } from '@/components/badges';
+import { DeadlineChip, FollowUpStatusBadge, PriorityBadge, RiskBadge } from '@/components/badges';
 import { RiskCard, VitalsTable } from '@/components/clinical';
-import { Alert, Badge, Button, Card, CardTitle, EmptyState, ErrorState, Field, Icon, Input, Loading, PageHeader, Select, Textarea, cx } from '@/components/ui';
+import { Alert, Button, ButtonLink, Card, CardTitle, EmptyState, ErrorState, Field, FormSection, Icon, Input, Loading, PageHeader, Select, Textarea, UnitInput, cx } from '@/components/ui';
 import { SyncBanner } from '@/components/SyncIndicator';
 import { useI18n } from '@/lib/i18n';
 
@@ -84,17 +83,22 @@ function Visit({ id }: { id: string }) {
   if (visits.loading && !visits.data) return <Loading />;
   if (!visit) {
     return (
-      <EmptyState title={tv.notAvailable}>
-        <Link className="text-brand-700 underline" href="/nurse">
-          {tv.notAvailableHint}
-        </Link>
+      <EmptyState
+        title={tv.notAvailable}
+        icon="wifiOff"
+        action={
+          <ButtonLink href="/nurse" variant="secondary" size="sm">
+            <Icon name="arrowLeft" className="h-3.5 w-3.5" /> {tv.back}
+          </ButtonLink>
+        }
+      >
+        {tv.notAvailableHint}
       </EmptyState>
     );
   }
 
   const rank = { SCHEDULED: 0, IN_PROGRESS: 1, COMPLETED: 2 } as const;
   const status = lastLocalStatus && rank[lastLocalStatus] > rank[visit.status] ? lastLocalStatus : visit.status;
-  const due = dueIn(visit.referral.deadline);
   const num = (v: string) => (v === '' ? undefined : Number(v));
 
   async function saveVitals(e: FormEvent) {
@@ -147,7 +151,7 @@ function Visit({ id }: { id: string }) {
   const hasObs = serverObs.length + localObs.length > 0;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <PageHeader
         back={{ href: '/nurse', label: tv.back }}
         eyebrow={tv.eyebrow}
@@ -157,9 +161,7 @@ function Visit({ id }: { id: string }) {
             <span>
               {t.common.years(age(visit.patient.birthDate))} · {visit.patient.sex === 'MALE' ? t.common.male : t.common.female}
             </span>
-            <Badge tone={status === 'COMPLETED' ? 'green' : status === 'IN_PROGRESS' ? 'brand' : 'blue'}>
-              {t.enums.followUpStatus[status]}
-            </Badge>
+            <FollowUpStatusBadge status={status} />
             <RiskBadge level={patient.data?.riskLevel ?? visit.patient.riskLevel} />
           </span>
         }
@@ -170,7 +172,7 @@ function Visit({ id }: { id: string }) {
 
       <Card>
         <CardTitle
-          description={<span className={cx(due.overdue && 'font-semibold text-red-700')}>{due.text}</span>}
+          description={<DeadlineChip deadline={visit.referral.deadline} />}
           action={<PriorityBadge priority={visit.referral.priority} />}
         >
           {tv.brief}
@@ -179,14 +181,15 @@ function Visit({ id }: { id: string }) {
         {visit.patient.diagnosisNote && visit.patient.diagnosisNote !== visit.referral.reason && (
           <p className="mt-1 text-sm text-slate-600">{visit.patient.diagnosisNote}</p>
         )}
-        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-line pt-4 text-sm text-slate-700">
-          <span className="min-w-0 flex-1">
+        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-line-soft pt-4 text-sm text-slate-700">
+          <span className="flex min-w-0 flex-1 items-start gap-1.5">
+            <Icon name="mapPin" className="mt-0.5 h-4 w-4 text-slate-400" />
             {visit.patient.address}, {visit.patient.district}
           </span>
           {visit.patient.phone && (
             <a
               href={`tel:${visit.patient.phone}`}
-              className="inline-flex h-10 items-center gap-2 rounded-[var(--radius-control)] border border-slate-300 px-4 font-semibold text-slate-800 hover:bg-slate-50"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-control)] px-4 font-medium text-slate-800 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 sm:h-10 sm:w-auto"
             >
               <Icon name="phone" /> {tv.callPatient}
             </a>
@@ -198,7 +201,7 @@ function Visit({ id }: { id: string }) {
         <Alert
           tone="green"
           action={
-            <button className="text-xs font-semibold underline" onClick={() => setSaved(null)}>
+            <button className="h-8 px-1 text-xs font-medium underline underline-offset-2" onClick={() => setSaved(null)}>
               {t.common.dismiss}
             </button>
           }
@@ -224,31 +227,68 @@ function Visit({ id }: { id: string }) {
       {status !== 'COMPLETED' && (
         <Card>
           <CardTitle description={tv.recordDesc}>
-            <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-600 text-xs text-white">1</span>
+            <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-xs font-medium text-white">1</span>
             {tv.record}
           </CardTitle>
-          <form onSubmit={saveVitals} className="space-y-5">
+          <form onSubmit={saveVitals} className="space-y-6">
             {formError && <Alert>{formError}</Alert>}
-            <fieldset>
-              <legend className="mb-2 text-sm font-semibold text-slate-900">{tv.vitals}</legend>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <Field label={tv.systolic} htmlFor="sys"><Input id="sys" type="number" inputMode="numeric" min={50} max={260} value={vitals.systolic} onChange={setV('systolic')} /></Field>
-                <Field label={tv.diastolic} htmlFor="dia"><Input id="dia" type="number" inputMode="numeric" min={30} max={160} value={vitals.diastolic} onChange={setV('diastolic')} /></Field>
-                <Field label={tv.pulse} htmlFor="pulse"><Input id="pulse" type="number" inputMode="numeric" min={20} max={250} value={vitals.pulse} onChange={setV('pulse')} /></Field>
-                <Field label={tv.temperature} htmlFor="temp"><Input id="temp" type="number" inputMode="decimal" step="0.1" min={30} max={44} value={vitals.temperature} onChange={setV('temperature')} /></Field>
-                <Field label={tv.spo2} htmlFor="spo2"><Input id="spo2" type="number" inputMode="numeric" min={50} max={100} value={vitals.spo2} onChange={setV('spo2')} /></Field>
-                <Field label={tv.condition} htmlFor="cond">
-                  <Select id="cond" value={vitals.generalCondition} onChange={setV('generalCondition')}>
-                    <option value="">{t.enums.condition.none}</option>
-                    {(['GOOD', 'FAIR', 'POOR', 'CRITICAL'] as const).map((c) => (
-                      <option key={c} value={c}>{t.enums.condition[c]}</option>
-                    ))}
-                  </Select>
+            <FormSection title={tv.groups.bp}>
+              <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+                <Field label={tv.f.systolic} htmlFor="sys">
+                  <UnitInput unit="mmHg" id="sys" type="number" inputMode="numeric" min={50} max={260} value={vitals.systolic} onChange={setV('systolic')} />
+                </Field>
+                <Field label={tv.f.diastolic} htmlFor="dia">
+                  <UnitInput unit="mmHg" id="dia" type="number" inputMode="numeric" min={30} max={160} value={vitals.diastolic} onChange={setV('diastolic')} />
                 </Field>
               </div>
-            </fieldset>
-            <fieldset>
-              <legend className="mb-2 text-sm font-semibold text-slate-900">{tv.symptoms}</legend>
+            </FormSection>
+            <FormSection title={tv.groups.heart}>
+              <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+                <Field label={tv.f.pulse} htmlFor="pulse">
+                  <UnitInput unit={t.risk.bpm} id="pulse" type="number" inputMode="numeric" min={20} max={250} value={vitals.pulse} onChange={setV('pulse')} />
+                </Field>
+                <Field label={tv.f.spo2} htmlFor="spo2">
+                  <UnitInput unit="%" id="spo2" type="number" inputMode="numeric" min={50} max={100} value={vitals.spo2} onChange={setV('spo2')} />
+                </Field>
+              </div>
+            </FormSection>
+            <FormSection title={tv.groups.general}>
+              <div className="grid gap-4 sm:grid-cols-[minmax(0,12rem)_1fr]">
+                <Field label={tv.f.temperature} htmlFor="temp">
+                  <UnitInput unit="°C" id="temp" type="number" inputMode="decimal" step="0.1" min={30} max={44} value={vitals.temperature} onChange={setV('temperature')} />
+                </Field>
+                <div role="radiogroup" aria-labelledby="cond-label" className="min-w-0">
+                  <p id="cond-label" className="mb-1.5 text-[13px] font-medium text-slate-700">
+                    {tv.condition}
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {(['GOOD', 'FAIR', 'POOR', 'CRITICAL'] as const).map((c) => {
+                      const on = vitals.generalCondition === c;
+                      return (
+                        <button
+                          type="button"
+                          role="radio"
+                          aria-checked={on}
+                          key={c}
+                          onClick={() => setVitals((v) => ({ ...v, generalCondition: on ? '' : c }))}
+                          className={cx(
+                            'h-10 rounded-[var(--radius-control)] border px-2 text-sm transition-colors',
+                            on
+                              ? c === 'CRITICAL' || c === 'POOR'
+                                ? 'border-red-500 bg-red-50 font-medium text-red-800'
+                                : 'border-brand-600 bg-brand-50 font-medium text-brand-800'
+                              : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
+                          )}
+                        >
+                          {t.enums.condition[c]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </FormSection>
+            <FormSection title={tv.symptoms} description={tv.symptomsHint}>
               <div className="flex flex-wrap gap-2">
                 {SYMPTOMS.map((s) => {
                   const on = symptoms.includes(s);
@@ -259,8 +299,8 @@ function Visit({ id }: { id: string }) {
                       aria-pressed={on}
                       onClick={() => setSymptoms((cur) => (on ? cur.filter((x) => x !== s) : [...cur, s]))}
                       className={cx(
-                        'inline-flex h-10 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium',
-                        on ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50',
+                        'inline-flex h-10 items-center gap-1.5 rounded-full border px-3.5 text-sm transition-colors',
+                        on ? 'border-brand-600 bg-brand-50 font-medium text-brand-800' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
                       )}
                     >
                       {on && <Icon name="check" className="h-3.5 w-3.5" />}
@@ -269,16 +309,22 @@ function Visit({ id }: { id: string }) {
                   );
                 })}
               </div>
-              <label htmlFor="other" className="sr-only">{tv.otherSymptoms}</label>
+              <label htmlFor="other" className="sr-only">
+                {tv.otherSymptoms}
+              </label>
               <Input id="other" className="mt-3" placeholder={tv.otherSymptoms} maxLength={300} value={vitals.other} onChange={setV('other')} />
-            </fieldset>
-            <Field label={tv.notes} htmlFor="notes" optional hint={tv.notesHint}>
-              <Textarea id="notes" rows={3} maxLength={1000} value={vitals.notes} onChange={setV('notes')} />
-            </Field>
-            <Button type="submit" size="lg" loading={saving} className="w-full sm:w-auto">
-              <Icon name={sync.online ? 'check' : 'device'} className="h-5 w-5" />
-              {sync.online ? tv.saveOnline : tv.saveOffline}
-            </Button>
+            </FormSection>
+            <div className="border-t border-line-soft pt-5">
+              <Field label={tv.notes} htmlFor="notes" optional hint={tv.notesHint}>
+                <Textarea id="notes" rows={3} maxLength={1000} value={vitals.notes} onChange={setV('notes')} />
+              </Field>
+            </div>
+            <div className="-mx-4 -mb-4 border-t border-line-soft bg-slate-50/70 px-4 py-3 sm:-mx-5 sm:-mb-5 sm:rounded-b-[var(--radius-card)] sm:px-5">
+              <Button type="submit" size="lg" loading={saving} className="w-full sm:w-auto">
+                <Icon name={sync.online ? 'check' : 'device'} className="h-5 w-5" />
+                {sync.online ? tv.saveOnline : tv.saveOffline}
+              </Button>
+            </div>
           </form>
         </Card>
       )}
@@ -302,7 +348,7 @@ function Visit({ id }: { id: string }) {
       {status !== 'COMPLETED' && (
         <Card>
           <CardTitle description={tv.completeDesc}>
-            <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-600 text-xs text-white">2</span>
+            <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-xs font-medium text-white">2</span>
             {tv.complete}
           </CardTitle>
           <form onSubmit={complete} className="space-y-4">
