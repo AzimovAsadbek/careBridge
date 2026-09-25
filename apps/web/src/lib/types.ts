@@ -73,6 +73,8 @@ export interface RiskAssessment {
   provider: string | null;
   model: string | null;
   aiPending: boolean;
+  /** { uz: { english: translated }, ru: {...} } for AI free text. */
+  i18n?: unknown;
   createdAt: string;
   updatedAt: string;
 }
@@ -216,6 +218,7 @@ export interface FeedbackItem {
     warnings: string[];
     model: string | null;
     aiPending: boolean;
+    i18n?: unknown;
   } | null;
 }
 
@@ -240,10 +243,12 @@ export interface Dashboard {
     deadline: string;
     overdue: boolean;
     reasons: string[];
+    reasonCodes?: string[];
     patient: { id: string; fullName: string; riskLevel: Priority | null; district: string };
     assignedDoctor: { fullName: string } | null;
   }[];
   insights: string[];
+  insightItems?: { code: string; value: number }[];
 }
 
 export interface AiStatus {

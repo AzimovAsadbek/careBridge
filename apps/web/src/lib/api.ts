@@ -1,4 +1,5 @@
 import { session } from './session';
+import { getDict } from './i18n';
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api';
 
@@ -60,8 +61,15 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
   return (await res.json()) as T;
 }
 
+/** User-facing, localised error text. Server validation details are shown as-is. */
 export function errorMessage(e: unknown): string {
-  if (e instanceof NetworkError) return 'You are offline or the server is unreachable.';
-  if (e instanceof ApiError) return e.message;
-  return 'Something went wrong. Please try again.';
+  const t = getDict();
+  if (e instanceof NetworkError) return t.errors.offline;
+  if (e instanceof ApiError) {
+    if (e.status === 401) return t.errors.invalidLogin;
+    if (e.status === 429) return t.errors.tooMany;
+    if (e.status >= 500) return t.errors.generic;
+    return e.message;
+  }
+  return t.errors.generic;
 }
