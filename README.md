@@ -1,8 +1,14 @@
 # CareBridge AI
 
-**Offline-first continuity of care: we connect the patient's journey from hospital to home, even when there is no internet.**
+CareBridge AI is a hackathon prototype for coordinating follow-up after a patient leaves hospital. A nurse can record a home visit offline. An administrator can review anonymous feedback in Uzbek, Russian and English, grouped by topic and priority.
 
-CareBridge AI combines three hackathon healthcare problems into **one patient journey**:
+## How a feedback report gets its priority
+
+When someone submits feedback, a set of local rules assigns an initial category and priority. A background job asks Gemini for a structured classification. The API validates the response with Zod and applies the priority rules before saving it. If the provider is unavailable, the initial classification is already available to staff.
+
+[Classification service](apps/api/src/ai/feedback-analysis.service.ts) · [Gemini client](apps/api/src/ai/gemini.provider.ts) · [Classification and fallback tests](apps/api/src/ai/feedback-analysis.service.spec.ts)
+
+## From discharge to follow-up
 
 | # | Problem | How CareBridge solves it |
 |---|---|---|
